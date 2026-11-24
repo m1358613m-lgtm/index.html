@@ -1,32 +1,39 @@
 
-const CACHE = "shakil-trade-v1";
-const FILES = ["./", "./index.html", "./manifest.json"];
+name: Deploy Shakil Trade Analyzer
 
-self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(FILES))
-  );
-  self.skipWaiting();
-});
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
-});
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
-self.addEventListener("fetch", event => {
-  const url = new URL(event.request.url);
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
-  // اطلاعات بازار باید آنلاین و تازه دریافت شوند.
-  if (url.hostname === "fapi.binance.com") return;
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
 
-  event.respondWith(
-    caches.match(event.request).then(cached =>
-      cached || fetch(event.request)
-    )
-  );
-});
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
