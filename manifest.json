@@ -1,0 +1,14 @@
+{
+  "name": "Shakil Trade Analyzer",
+  "short_name": "Shakil Trade",
+  "description": "اسکنر هوشمند تحلیل بازار فیوچرز",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#101827",
+  "lang": "fa",
+  "dir": "rtl",
+  "icons": []
+}
