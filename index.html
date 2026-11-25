@@ -159,9 +159,17 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 <div class="toast" id="toast"></div>
 <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <script>
-// ==================== Binance API Config ====================
+// ==================== Binance API Config with Fallback Proxies ====================
 const API_BASE = 'https://fapi.binance.com';
 const PUB = '/fapi/v1';
+
+// لیست پروکسی‌های جایگزین
+const PROXIES = [
+  'https://api.allorigins.win/raw?url=',
+  'https://corsproxy.io/?',
+  'https://api.codetabs.com/v1/proxy?quest='
+];
+
 let RISK = JSON.parse(localStorage.getItem('riskSettings')) || { capital:50, perTrade:1, leverage:20, maxRiskPct:30 };
 let WHALE_THRESHOLD = parseFloat(localStorage.getItem('whaleThreshold')) || 5000;
 let wsWhale = null;
