@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Shakil Trade Analyzer (Binance)</title>
+<title>Shakil Trade Analyzer (OKX)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a0a0a">
 <style>
@@ -39,10 +39,6 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 .badge-WAIT{background:rgba(102,102,102,.2);color:var(--gray)}
 .signal-details{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:10px;color:var(--text-dim)}
 .signal-details span{color:var(--text)}
-.tf-row{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
-.tf-badge{font-size:9px;padding:2px 6px;border-radius:6px;background:var(--card2);border:1px solid var(--border)}
-.tf-badge.bull{color:var(--green);border-color:rgba(0,200,83,.3)}
-.tf-badge.bear{color:var(--red);border-color:rgba(255,23,68,.3)}
 .whale-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}
 .whale-item:last-child{border-bottom:none}
 .whale-side-buy{color:var(--green)}.whale-side-sell{color:var(--red)}
@@ -69,7 +65,7 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 <body>
 
 <header class="app-header">
-  <h1>Shakil Trade Analyzer (Binance)</h1>
+  <h1>Shakil Trade Analyzer</h1>
   <div><span class="status-dot" id="connDot"></span><span style="font-size:10px;color:var(--text-dim)" id="connText">اتصال...</span></div>
 </header>
 
@@ -79,6 +75,7 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
   <button class="nav-tab" data-page="orderbook">سفارشات سنگین</button>
   <button class="nav-tab" data-page="technical">نمودار</button>
   <button class="nav-tab" data-page="risk">مدیریت ریسک</button>
+  <button class="nav-tab" data-page="settings">تنظیمات</button>
 </nav>
 
 <div class="page active" id="page-dashboard">
@@ -112,7 +109,6 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 <div class="page" id="page-orderbook">
   <div class="card">
     <div class="card-title">🐋 تشخیص سفارشات سنگین</div>
-    <div style="font-size:10px;color:var(--yellow);margin-bottom:10px">⚠️ این بخش به وب‌سوکت نیاز دارد و ممکن است به فیلترشکن قوی نیاز داشته باشد.</div>
     <div class="form-group"><label>آستانه حجم سفارش (USDT)</label><input type="number" id="whaleThreshold" value="5000" min="100" step="1000"></div>
     <div class="form-group"><label>نماد</label><select id="whaleSymbolSelect"></select></div>
     <button class="btn btn-gold" onclick="connectWhaleWS()">اتصال و رصد</button>
@@ -152,17 +148,24 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
   </div>
 </div>
 
+<div class="page" id="page-settings">
+  <div class="card">
+    <div class="card-title">⚙️ تنظیمات پروکسی</div>
+    <div class="form-group">
+      <label>لینک پروکسی اختصاصی (Cloudflare Worker)</label>
+      <input type="text" id="proxyInput" placeholder="https://your-worker.workers.dev/?url=">
+    </div>
+    <button class="btn btn-gold" onclick="saveSettings()">ذخیره تنظیمات</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <script>
-// ==================== Binance API Config with Fallback Proxies ====================
-const API_BASE = 'https://fapi.binance.com';
-const PUB = '/fapi/v1';
-const PROXIES = [
-  'https://api.codetabs.com/v1/proxy?quest=',
-  'https://api.allorigins.win/raw?url=',
-  'https://corsproxy.io/?'
-];
+// ==================== OKX API Config ====================
+const API_BASE = 'https://www.okx.com';
+const PUB = '/api/v5';
+let PROXY = localStorage.getItem('proxyUrl') || 'https://shakil.m1358613m.workers.dev/?url=';
 
 let RISK = JSON.parse(localStorage.getItem('riskSettings')) || { capital:50, perTrade:1, leverage:20, maxRiskPct:30 };
 let WHALE_THRESHOLD = parseFloat(localStorage.getItem('whaleThreshold')) || 5000;
@@ -174,41 +177,52 @@ function fmt(n,d=4){ return (n===null||n===undefined||isNaN(n))?'—':Number(n).
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 function setConn(ok){ $('connDot').className='status-dot '+(ok?'online':'offline'); $('connText').textContent=ok?'متصل':'قطع'; }
 
+// ==================== API Fetch ====================
 async function apiFetch(path, params={}){
   let targetUrl = API_BASE + PUB + path;
   const qs = new URLSearchParams(params).toString();
   if(qs) targetUrl += '?' + qs;
   
-  for(let i = 0; i < PROXIES.length; i++) {
-    const url = PROXIES[i] + encodeURIComponent(targetUrl);
-    const ctrl = new AbortController();
-    const timer = setTimeout(()=>ctrl.abort(), 8000);
-    try {
-      const res = await fetch(url, {signal:ctrl.signal});
-      clearTimeout(timer);
-      if(res.ok) {
-        setConn(true);
-        return await res.json();
-      }
-    } catch(e) { 
-      clearTimeout(timer); 
-      console.warn(`پروکسی ${i+1} خطا داد.`);
-    }
+  let url = targetUrl;
+  if(PROXY) {
+    url = PROXY + encodeURIComponent(targetUrl);
   }
-  setConn(false);
-  throw new Error('عدم دسترسی به سرور (همه پروکسی‌ها خطا دادند)');
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), 12000);
+  try {
+    const res = await fetch(url, {signal:ctrl.signal});
+    clearTimeout(timer);
+    if(res.ok) {
+      setConn(true);
+      return await res.json();
+    }
+    throw new Error('HTTP '+res.status);
+  } catch(e) { 
+    clearTimeout(timer); 
+    setConn(false);
+    throw new Error('عدم دسترسی. لطفاً لینک پروکسی را در تنظیمات بررسی کنید.');
+  }
 }
 
 async function fetchInstruments(){
-  const data = await apiFetch('/exchangeInfo');
-  const list = data.symbols || [];
-  return list.filter(c => c.symbol.endsWith('USDT') && c.contractType === 'PERPETUAL');
+  const data = await apiFetch('/public/instruments', {instType:'SWAP'});
+  setConn(true);
+  const list = data.data || [];
+  return list.filter(c => c.settleCcy === 'USDT');
 }
 
 async function fetchKlines(symbol, interval, limit=200){
-  const data = await apiFetch('/klines', {symbol, interval, limit});
-  if(!Array.isArray(data)) return [];
-  return data.map(k => ({time:Math.floor(k[0]/1000), open:+k[1], high:+k[2], low:+k[3], close:+k[4], volume:+k[5]}));
+  // OKX bar formats: 1m, 5m, 15m, 1H, 4H
+  const barMap = {'1m':'1m','5m':'5m','15m':'15m','1h':'1H','4h':'4H'};
+  const bar = barMap[interval] || '1H';
+  const data = await apiFetch('/market/candles', {instId:symbol, bar:bar, limit:limit});
+  if(!Array.isArray(data.data)) return [];
+  // OKX returns [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
+  return data.data.map(k => ({
+    time: Math.floor(parseInt(k[0])/1000),
+    open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5]
+  })).sort((a,b)=>a.time-b.time);
 }
 
 // ==================== Indicators ====================
@@ -268,7 +282,7 @@ async function startScan(){
     const symbols=instruments.slice(0,limit);
     const results=[];
     for(const ins of symbols){
-      const sym=ins.symbol;
+      const sym=ins.instId; // e.g. BTC-USDT-SWAP
       try {
         const [k4h,k1h,k15m,k5m]=await Promise.all([
           fetchKlines(sym,'4h',100), fetchKlines(sym,'1h',100),
@@ -296,7 +310,7 @@ async function startScan(){
     $('scanStatus').textContent=`${results.length} سیگنال از ${limit} نماد`;
     updateDashboard(results);
   } catch(e){
-    $('scanResults').innerHTML=`<div class="empty-state">خطا: ${e.message}<br><small>لطفاً فیلترشکن را روشن کنید.</small></div>`;
+    $('scanResults').innerHTML=`<div class="empty-state">خطا: ${e.message}<br><small>لطفاً فیلترشکن را روشن کنید و لینک پروکسی را در تنظیمات بررسی کنید.</small></div>`;
   } finally { btn.disabled=false; btn.textContent='شروع اسکن'; }
 }
 
@@ -324,7 +338,7 @@ function updateDashboard(results){
   $('recentSignals').innerHTML=results.slice(0,3).map(s=>signalCardHTML(s)).join('')||'<div class="empty-state">سیگنالی نیست</div>';
 }
 
-// ==================== WebSocket ====================
+// WebSocket OKX for Order Book
 function connectWhaleWS(){
   if(wsWhale){ wsWhale.close(); wsWhale=null; }
   const sym=$('whaleSymbolSelect').value;
@@ -335,17 +349,19 @@ function connectWhaleWS(){
   $('whaleList').innerHTML='<div class="loading"><div class="spinner"></div>در حال رصد...</div>';
 
   try {
-    wsWhale=new WebSocket('wss://fstream.binance.com/ws');
+    wsWhale=new WebSocket('wss://ws.okx.com:8443/ws/v5/public');
     wsWhale.onopen=()=>{
       $('whaleStatus').textContent='متصل - در حال رصد';
-      const sub={method:'SUBSCRIBE', params:[`${sym.toLowerCase()}@depth20@1000ms`], id:Date.now()};
+      const sub={op:'subscribe', args:[{channel:'books5', instId:sym}]};
       wsWhale.send(JSON.stringify(sub));
-      setInterval(()=>{ if(wsWhale&&wsWhale.readyState===1) wsWhale.send(JSON.stringify({method:'PING'})); }, 30000);
+      setInterval(()=>{ if(wsWhale&&wsWhale.readyState===1) wsWhale.send('ping'); }, 25000);
     };
     wsWhale.onmessage=(ev)=>{
+      if(ev.data === 'pong') return;
       try {
         const msg=JSON.parse(ev.data);
-        if(msg.bids && msg.asks) {
+        if(msg.data && msg.data[0]) {
+          const book = msg.data[0];
           const processSide=(arr,side)=>{
             arr.forEach(lvl=>{
               const price=parseFloat(lvl[0]);
@@ -354,7 +370,7 @@ function connectWhaleWS(){
               if(notional>=WHALE_THRESHOLD){ addWhaleToUI({side, price, notional, symbol:sym}); }
             });
           };
-          processSide(msg.bids,'BUY'); processSide(msg.asks,'SELL');
+          processSide(book.bids,'BUY'); processSide(book.asks,'SELL');
         }
       } catch(e){}
     };
@@ -419,10 +435,10 @@ async function loadSymbols(){
   try {
     const ins=await fetchInstruments();
     const sel=$('symbolSelect'), wsel=$('whaleSymbolSelect');
-    const opts=ins.map(i=>`<option value="${i.symbol}">${i.symbol}</option>`).join('');
+    const opts=ins.map(i=>`<option value="${i.instId}">${i.instId}</option>`).join('');
     sel.innerHTML=opts; wsel.innerHTML=opts;
     sel.onchange=()=>loadChart(sel.value);
-    if(ins.length) loadChart(ins[0].symbol);
+    if(ins.length) loadChart(ins[0].instId);
   } catch(e){ toast('خطا در دریافت نمادها'); }
 }
 
@@ -448,7 +464,18 @@ function saveRiskSettings(){
   localStorage.setItem('riskSettings',JSON.stringify(RISK)); toast('ذخیره شد');
 }
 
-// ==================== Init ====================
+function saveSettings(){
+  const val = $('proxyInput').value.trim();
+  if(!val.endsWith('?url=')) {
+    toast('لینک باید به ?url= ختم شود!');
+    return;
+  }
+  localStorage.setItem('proxyUrl', val);
+  PROXY = val;
+  toast('ذخیره شد. در حال تست اتصال...');
+  init();
+}
+
 document.querySelectorAll('.nav-tab').forEach(tab=>{
   tab.addEventListener('click',()=>{
     document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
@@ -462,6 +489,7 @@ async function init(){
   $('riskCapital').value=RISK.capital; $('riskPerTrade').value=RISK.perTrade;
   $('riskLeverage').value=RISK.leverage; $('riskMaxPct').value=RISK.maxRiskPct;
   $('whaleThreshold').value=WHALE_THRESHOLD;
+  $('proxyInput').value=PROXY;
   try { await fetchInstruments(); setConn(true); } catch(e){ setConn(false); }
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
