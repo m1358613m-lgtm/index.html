@@ -17,18 +17,20 @@ export default {
     const incoming = new URL(request.url);
     const target = incoming.searchParams.get("url");
 
-    // Worker health check
+    // SHAKIL VERSION CHECK
     if (!target) {
       return new Response(JSON.stringify({
         success: true,
         worker: "SHAKIL",
+        version: "V2",
         exchange: "MEXC",
-        message: "Worker is running"
+        message: "SHAKIL V2 ACTIVE"
       }), {
         status: 200,
         headers: {
           ...corsHeaders,
-          "Content-Type": "application/json; charset=utf-8"
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store"
         }
       });
     }
@@ -40,17 +42,19 @@ export default {
     } catch {
       return new Response(JSON.stringify({
         success: false,
-        error: "Invalid target URL"
+        error: "Invalid target URL",
+        version: "V2"
       }), {
         status: 400,
         headers: {
           ...corsHeaders,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store"
         }
       });
     }
 
-    // Only allow the official MEXC contract API
+    // Allow only official MEXC contract API
     if (
       targetURL.protocol !== "https:" ||
       targetURL.hostname !== "contract.mexc.com" ||
@@ -58,12 +62,14 @@ export default {
     ) {
       return new Response(JSON.stringify({
         success: false,
-        error: "Target not allowed"
+        error: "Target not allowed",
+        version: "V2"
       }), {
         status: 403,
         headers: {
           ...corsHeaders,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store"
         }
       });
     }
@@ -78,10 +84,12 @@ export default {
       });
 
       const responseHeaders = new Headers(corsHeaders);
+
       responseHeaders.set(
         "Content-Type",
         upstream.headers.get("Content-Type") || "application/json"
       );
+
       responseHeaders.set("Cache-Control", "no-store");
 
       const body = await upstream.text();
@@ -95,12 +103,14 @@ export default {
       return new Response(JSON.stringify({
         success: false,
         error: "MEXC connection failed",
-        details: String(error)
+        details: String(error),
+        version: "V2"
       }), {
         status: 502,
         headers: {
           ...corsHeaders,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store"
         }
       });
     }
