@@ -1,293 +1,108 @@
-<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#0a0a0a">
-<title>Shakil Trade Analyzer</title>
-<style>
-:root{--bg:#090909;--card:#141414;--card2:#1c1c1c;--border:#303030;--gold:#dfbd45;--text:#eee;--muted:#999;--green:#00c875;--red:#ff405e;--cyan:#16c5d5;--yellow:#ffc94a}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Tahoma,Arial,sans-serif;font-size:14px}
-header{position:sticky;top:0;z-index:10;background:#111;border-bottom:1px solid #6e5922;padding:15px;display:flex;justify-content:space-between;align-items:center}
-h1{font-size:17px;color:var(--gold);margin:0}.status{font-size:11px;color:var(--muted)}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#777;margin-left:5px}.dot.ok{background:var(--green);box-shadow:0 0 7px var(--green)}.dot.bad{background:var(--red)}
-nav{display:flex;gap:6px;overflow-x:auto;white-space:nowrap;padding:10px;background:#151515;border-bottom:1px solid var(--border)}
-nav button{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:9px 13px;font-size:12px}
-nav button.active{background:var(--gold);color:#111;font-weight:bold;border-color:var(--gold)}
-main{padding:13px;max-width:900px;margin:auto}.page{display:none}.page.active{display:block}
-.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
-h2{font-size:14px;color:var(--gold);margin:0 0 13px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stat{background:var(--card2);padding:12px;border-radius:9px;text-align:center}.stat small{display:block;color:var(--muted);font-size:11px;margin-bottom:6px}.stat b{font-size:17px;color:var(--gold)}
-label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
-input,select{width:100%;background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:12px;font-size:14px;outline:none}
-input:focus,select:focus{border-color:var(--gold)}.ltr{direction:ltr;text-align:left}
-button.action{width:100%;border:0;border-radius:9px;padding:13px;margin-top:10px;background:linear-gradient(120deg,#e2c34d,#b99518);color:#111;font-weight:bold;font-size:14px}
-button.outline{background:transparent;border:1px solid var(--gold);color:var(--gold)}
-button:disabled{opacity:.5}
-.note,.empty{color:var(--muted);font-size:12px;line-height:1.8;text-align:center;padding:16px}
-.item{background:#191919;border:1px solid var(--border);border-right:4px solid #777;border-radius:10px;padding:12px;margin:9px 0}
-.item.LONG{border-right-color:var(--green)}.item.SHORT{border-right-color:var(--red)}.item.SETUP_LONG{border-right-color:var(--cyan)}.item.SETUP_SHORT{border-right-color:var(--yellow)}
-.itemhead{display:flex;justify-content:space-between;gap:8px;font-weight:bold;margin-bottom:9px}.tag{font-size:10px;border-radius:12px;padding:4px 8px;background:#292929;color:var(--gold)}
-.details{display:grid;grid-template-columns:1fr 1fr;gap:7px;color:var(--muted);font-size:11px}.details b{color:var(--text);direction:ltr;display:inline-block}
-.good{color:var(--green)}.bad{color:var(--red)}
-#priceChart{height:270px;width:100%}#rsiChart{height:120px;width:100%;margin-top:8px}
-#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#242424;border:1px solid var(--gold);padding:10px 16px;border-radius:20px;z-index:30;display:none;font-size:12px;max-width:90%;text-align:center}
-hr{border:0;border-top:1px solid var(--border);margin:12px 0}
-</style>
-</head>
-<body>
-<header><h1>Shakil Trade Analyzer</h1><div class="status"><span class="dot" id="connDot"></span><span id="connText">در حال بررسی</span></div></header>
-<nav id="tabs">
-<button class="active" data-page="dashboard">داشبورد</button><button data-page="scanner">اسکنر</button><button data-page="whales">سفارشات سنگین</button><button data-page="chart">نمودار</button><button data-page="risk">مدیریت ریسک</button><button data-page="settings">تنظیمات</button>
-</nav>
-<main>
-<section class="page active" id="dashboard">
-<div class="card"><h2>📊 وضعیت بازار</h2><div class="grid"><div class="stat"><small>قراردادهای USDT</small><b id="contractCount">—</b></div><div class="stat"><small>سیگنال‌های آخرین اسکن</small><b id="signalCount">0</b></div></div><div class="note" id="marketMessage">برای دریافت اطلاعات، اتصال را بررسی کنید.</div></div>
-<div class="card"><h2>📈 آخرین سیگنال‌ها</h2><div id="dashboardSignals" class="empty">هنوز اسکن انجام نشده است.</div></div>
-<div class="card"><h2>🐋 سفارشات سنگین اخیر</h2><div id="dashboardWhales" class="empty">هنوز سفارشی ثبت نشده است.</div></div>
-</section>
-<section class="page" id="scanner">
-<div class="card"><h2>🔍 اسکن چندتایم‌فریمی</h2><label>تعداد نمادها (۳ تا ۳۰)</label><input id="scanLimit" type="number" min="3" max="30" value="15"><label>حداقل امتیاز نمایش</label><select id="minScore"><option value="55">۵۵ - نمایش موقعیت‌های در حال تشکیل</option><option value="70" selected>۷۰ - سخت‌گیرانه</option><option value="80">۸۰ - فقط قوی</option></select><button class="action" id="scanBtn">شروع اسکن</button><div id="scanStatus" class="note">آماده اسکن</div><div class="note">این برنامه فقط تحلیل و نمایش داده عمومی انجام می‌دهد و هیچ سفارشی ثبت نمی‌کند. سیگنال تضمین سود نیست.</div></div>
-<div id="scanResults" class="empty">برای شروع، دکمه اسکن را بزنید.</div>
-</section>
-<section class="page" id="whales">
-<div class="card"><h2>🐋 رصد نقدینگی و سفارش‌های باز دفتر سفارش</h2><label>حداقل ارزش سفارش (USDT)</label><input id="whaleThreshold" type="number" value="5000" min="100"><label>نماد قرارداد</label><select id="whaleSymbol"><option value="">ابتدا نمادها دریافت شوند</option></select><button class="action" id="whaleBtn">اتصال و رصد سفارش‌ها</button><div class="note" id="whaleStatus">برای مشاهده سفارش‌های بزرگ یک نماد را انتخاب کنید.</div></div>
-<div class="card"><h2>📋 سفارشات شناسایی‌شده</h2><div id="whaleList" class="empty">هنوز سفارشی شناسایی نشده است.</div></div>
-</section>
-<section class="page" id="chart">
-<div class="card"><h2>📉 نمودار قیمت + RSI</h2><label>نماد</label><select id="chartSymbol"><option value="">در حال دریافت نمادها...</option></select><label>تایم‌فریم</label><select id="chartTF"><option value="Min5">۵ دقیقه</option><option value="Min15">۱۵ دقیقه</option><option value="Min60" selected>۱ ساعت</option><option value="Hour4">۴ ساعت</option><option value="Day1">روزانه</option></select><div id="priceChart"></div><div id="rsiChart"></div><div id="indicatorSummary" class="note">نماد را انتخاب کنید.</div></div>
-</section>
-<section class="page" id="risk">
-<div class="card"><h2>💰 پارامترهای ریسک</h2><label>سرمایه (USDT)</label><input id="capital" type="number" min="1" step="any" value="50"><label>ریسک هدف هر معامله (USDT)</label><input id="riskTrade" type="number" min="0.1" step="any" value="1"><label>اهرم</label><input id="leverage" type="number" min="1" max="125" value="20"><label>حداکثر ریسک مجاز از سرمایه (%)</label><input id="maxRisk" type="number" min="1" max="100" value="30"><button class="action" id="saveRisk">ذخیره تنظیمات ریسک</button></div>
-<div class="card"><h2>🧮 ماشین‌حساب پوزیشن</h2><label>جهت معامله</label><select id="calcSide"><option value="LONG">LONG</option><option value="SHORT">SHORT</option></select><label>قیمت ورود</label><input id="entry" type="number" step="any" inputmode="decimal" placeholder="مثال: 0.0234"><label>حد ضرر</label><input id="stop" type="number" step="any" inputmode="decimal" placeholder="مثال: 0.0225"><label>ضریب قرارداد (Contract Size)</label><input id="contractSize" type="number" step="any" value="1"><button class="action outline" id="calcBtn">محاسبه حجم و ریسک</button><div id="calcResult" class="note">قیمت ورود و حد ضرر را وارد کنید.</div></div>
-</section>
-<section class="page" id="settings">
-<div class="card"><h2>⚙️ تنظیمات اتصال</h2><label>آدرس اصلی Cloudflare Worker</label><input id="proxyInput" class="ltr" type="url" placeholder="https://shakil.example.workers.dev/"><div class="note">فقط آدرس اصلی Worker را وارد کنید؛ برنامه خودش پارامتر url را اضافه می‌کند. آدرس را با ?url= وارد نکنید.</div><button class="action" id="saveProxy">ذخیره و آزمایش اتصال</button><button class="action outline" id="testProxy">آزمایش دوباره اتصال</button><hr><div class="note" id="apiDiagnostic">وضعیت API هنوز آزمایش نشده است.</div></div>
-</section>
-</main>
-<div id="toast"></div>
-<script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
-<script>
-'use strict';
-// Shakil Trade Analyzer - public market data only; never places orders.
-const API_HOST='https://contract.mexc.com';
-const API_PREFIX='/api/v1';
-const $=id=>document.getElementById(id);
-const wait=ms=>new Promise(r=>setTimeout(r,ms));
-const fmt=(n,d=5)=>Number.isFinite(Number(n))?Number(n).toLocaleString('en-US',{maximumFractionDigits:d}):'—';
-let contracts=[], tickers=[], lastSignals=[], ws=null, chart=null, candleSeries=null, rsiChart=null, rsiSeries=null;
-let whaleTimer=null;
-let RISK=loadJSON('shakilRisk',{capital:50,perTrade:1,leverage:20,maxRiskPct:30});
-if(!(RISK.capital>0&&RISK.perTrade>0&&RISK.leverage>=1&&RISK.maxRiskPct>0&&RISK.maxRiskPct<=100))RISK={capital:50,perTrade:1,leverage:20,maxRiskPct:30};
-function loadJSON(k,def){try{return JSON.parse(localStorage.getItem(k))||def}catch(e){return def}}
-function toast(s){const t=$('toast');t.textContent=s;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',2600)}
-function setConn(ok,msg){$('connDot').className='dot '+(ok?'ok':'bad');$('connText').textContent=msg||(ok?'متصل':'قطع')}
-function normalizeProxy(v){
- v=(v||'').trim().replace(/^=+/,'');
- // Accept either the Worker root or a mistakenly pasted trailing ?url=
- v=v.replace(/[?&]url=?$/i,'').replace(/\/+$/,'');
- return v;
-}
-function buildURL(target){
- const p=normalizeProxy(localStorage.getItem('shakilProxy')||'');
- if(!p)return target;
- // Cloudflare Worker receives the full MEXC URL in the url query parameter.
- return p+'/?url='+encodeURIComponent(target);
-}
-async function api(path,params={}){
- const u=new URL(API_HOST+API_PREFIX+path);
- Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,String(v))});
- const target=u.toString(), url=buildURL(target), controller=new AbortController();
- const timer=setTimeout(()=>controller.abort(),16000);
- try{
-  const res=await fetch(url,{signal:controller.signal,cache:'no-store'});
-  const raw=await res.text();
-  let data;try{data=JSON.parse(raw)}catch(e){
-   const detail=(raw||'').replace(/<[^>]*>/g,' ').trim().slice(0,160);
-   throw new Error('پاسخ غیر JSON؛ HTTP '+res.status+(detail?' | '+detail:''));
-  }
-  if(!res.ok)throw new Error((data.error||data.message||'خطای سرور')+' | HTTP '+res.status);
-  if(data&&data.success===false)throw new Error(data.error||data.message||'API success=false');
-  if(data&&data.code!==undefined&&Number(data.code)!==0)throw new Error(data.message||('API code '+data.code));
-  setConn(true);return data;
- }catch(e){setConn(false);throw e}finally{clearTimeout(timer)}
-}
-const TF={'Min5':300,'Min15':900,'Min60':3600,'Hour4':14400,'Day1':86400};
-async function fetchContracts(){
- const r=await api('/contract/detail');
- const a=Array.isArray(r.data)?r.data:[];
- contracts=a.filter(x=>x.symbol&&/_USDT$/i.test(x.symbol)&&x.apiAllowed!==false);
- if(!contracts.length)throw new Error('فهرست قراردادهای قابل استفاده خالی است');
- fillSymbolMenus();$('contractCount').textContent=contracts.length;
- return contracts;
-}
-async function fetchTickers(){
- try{const r=await api('/contract/ticker');tickers=Array.isArray(r.data)?r.data:(r.data?[r.data]:[]);return tickers}catch(e){tickers=[];return []}
-}
-function fillSymbolMenus(){
- const opts=contracts.map(c=>`<option value="${c.symbol}">${c.symbol.replace('_',' / ')}</option>`).join('');
- $('chartSymbol').innerHTML=opts;$('whaleSymbol').innerHTML=opts;
-}
-async function fetchKlines(symbol,interval,count=160){
- const sec=TF[interval]||3600, end=Math.floor(Date.now()/1000), start=end-sec*count;
- const r=await api('/contract/kline/'+encodeURIComponent(symbol),{interval,start,end});
- const d=r.data||{};
- if(!Array.isArray(d.time))return [];
- return d.time.map((t,i)=>({time:Number(t),open:+d.open[i],high:+d.high[i],low:+d.low[i],close:+d.close[i],volume:Number((d.vol||[])[i]??(d.amount||[])[i]??0)}))
- .filter(k=>Number.isFinite(k.close)&&k.close>0).sort((a,b)=>a.time-b.time);
-}
-function ema(a,n){let out=Array(a.length).fill(null),prev=null,k=2/(n+1);for(let i=0;i<a.length;i++){if(i<n-1)continue;if(prev===null)prev=a.slice(0,n).reduce((x,y)=>x+y,0)/n;else prev=a[i]*k+prev*(1-k);out[i]=prev}return out}
-function rsi(a,n=14){let out=Array(a.length).fill(null);if(a.length<=n)return out;let gain=0,loss=0;for(let i=1;i<=n;i++){let d=a[i]-a[i-1];gain+=Math.max(d,0);loss+=Math.max(-d,0)}gain/=n;loss/=n;out[n]=loss===0?100:100-100/(1+gain/loss);for(let i=n+1;i<a.length;i++){let d=a[i]-a[i-1];gain=(gain*(n-1)+Math.max(d,0))/n;loss=(loss*(n-1)+Math.max(-d,0))/n;out[i]=loss===0?100:100-100/(1+gain/loss)}return out}
-function atr(k,n=14){if(k.length<n+1)return null;let tr=[];for(let i=1;i<k.length;i++)tr.push(Math.max(k[i].high-k[i].low,Math.abs(k[i].high-k[i-1].close),Math.abs(k[i].low-k[i-1].close)));return tr.slice(-n).reduce((a,b)=>a+b,0)/n}
-function analyze(k){
- if(!k||k.length<55)return null;const c=k.map(x=>x.close),v=k.map(x=>x.volume),e20=ema(c,20),e50=ema(c,50),rv=rsi(c),i=c.length-1;
- const avg=v.slice(-21,-1).reduce((a,b)=>a+b,0)/Math.max(1,v.slice(-21,-1).length);
- return {price:c[i],up:e20[i]>e50[i]&&c[i]>e20[i],down:e20[i]<e50[i]&&c[i]<e20[i],rsi:rv[i],atr:atr(k),volRatio:avg>0?v[i]/avg:0,ema20:e20[i],ema50:e50[i],prevHigh:Math.max(...k.slice(-21,-1).map(x=>x.high)),prevLow:Math.min(...k.slice(-21,-1).map(x=>x.low))};
-}
-function scoreTF(a4,a1,a15,a5){
- if(!a4||!a1||!a15||!a5)return {type:'WAIT',score:0,reason:'داده کافی نیست'};
- let bull=0,bear=0,score=0;
- if(a4.up){bull++;score+=25}else if(a4.down){bear++;score+=25}
- if(a1.up){bull++;score+=20}else if(a1.down){bear++;score+=20}
- if(a15.rsi>52){bull++;score+=10}else if(a15.rsi<48){bear++;score+=10}
- if(a15.price>a15.ema20&&a15.rsi>50){bull++;score+=8}else if(a15.price<a15.ema20&&a15.rsi<50){bear++;score+=8}
- if(a5.rsi>52){bull++;score+=10}else if(a5.rsi<48){bear++;score+=10}
- if(a5.volRatio>=1.15)score+=7;
- if(bull>=3&&bear<=1)score+=10;else if(bear>=3&&bull<=1)score+=10;else score-=12;
- const direction=bull>bear?'LONG':bear>bull?'SHORT':'WAIT';
- if(direction==='WAIT')return {type:'WAIT',score:Math.max(0,score),bull,bear};
- const type=score>=75?'CONFIRMED_'+direction:score>=55?'SETUP_'+direction:'WAIT';
- return {type,score:Math.max(0,Math.min(100,score)),bull,bear};
-}
-function contractSize(symbol){const c=contracts.find(x=>x.symbol===symbol);return Number(c?.contractSize)||1}
-function calcPositionValues(entry,stop,side,cs){
- const capital=Number(RISK.capital),target=Math.min(Number(RISK.perTrade),capital*Number(RISK.maxRiskPct)/100);
- const dist=Math.abs(entry-stop),fee=.0006;
- if(!(entry>0&&stop>0&&dist>0&&cs>0&&capital>0&&target>0&&RISK.leverage>0))return {error:'همه مقادیر باید عدد مثبت و معتبر باشند.'};
- if((side==='LONG'&&stop>=entry)||(side==='SHORT'&&stop<=entry))return {error:'برای LONG حد ضرر باید پایین‌تر از ورود و برای SHORT بالاتر از ورود باشد.'};
- // Include estimated opening and closing taker fees in the risk budget.
- const riskPerContract=dist*cs+(entry+stop)*cs*fee;
- const qty=target/riskPerContract;
- const notional=qty*entry*cs, margin=notional/Number(RISK.leverage);
- const grossLoss=qty*dist*cs, fees=qty*(entry+stop)*cs*fee, total=grossLoss+fees;
- if(total>capital*Number(RISK.maxRiskPct)/100+1e-8)return {error:'زیان برآوردی با کارمزد از سقف ریسک مجاز بیشتر است.'};
- return {qty,notional,margin,grossLoss,fees,total,rr1:1,side};
-}
-function signalHTML(s){
- const cls=s.type.includes('LONG')?'LONG':s.type.includes('SHORT')?'SHORT':'';
- return `<div class="item ${cls}"><div class="itemhead"><span>${s.symbol}</span><span class="tag">${s.type.replace('_',' ')} | ${s.score}/100</span></div><div class="details"><div>ورود: <b>${fmt(s.entry)}</b></div><div>حد ضرر: <b>${fmt(s.stop)}</b></div><div>هدف ۱: <b>${fmt(s.tp1)}</b></div><div>هدف ۲: <b>${fmt(s.tp2)}</b></div><div>حجم قرارداد: <b>${fmt(s.qty,4)}</b></div><div>مارجین تقریبی: <b>${fmt(s.margin,2)} USDT</b></div><div>زیان با کارمزد: <b>${fmt(s.total,3)} USDT</b></div><div>تایید: <b>${s.type.startsWith('CONFIRMED')?'تأییدشده':'در حال تشکیل'}</b></div></div></div>`;
-}
-async function scan(){
- const btn=$('scanBtn');btn.disabled=true;btn.textContent='در حال اسکن...';$('scanResults').innerHTML='<div class="empty">در حال دریافت داده‌های بازار...</div>';
- try{
-  if(!contracts.length)await fetchContracts();
-  const sorted=[...contracts];await fetchTickers();
-  if(tickers.length){const map=new Map(tickers.map(t=>[t.symbol,t]));sorted.sort((a,b)=>{const tv=x=>Number(x?.amount24??x?.volume24??x?.turnover24??x?.amount)||0;return tv(map.get(b.symbol))-tv(map.get(a.symbol))})}
-  const limit=Math.max(3,Math.min(30,Number($('scanLimit').value)||15)),min=Number($('minScore').value);
-  const found=[],errors=[];
-  for(let i=0;i<Math.min(limit,sorted.length);i++){
-   const sym=sorted[i].symbol;$('scanStatus').textContent=`در حال بررسی ${i+1} از ${Math.min(limit,sorted.length)}: ${sym}`;
-   try{
-    const [k4,k1,k15,k5]=await Promise.all([fetchKlines(sym,'Hour4',100),fetchKlines(sym,'Min60',100),fetchKlines(sym,'Min15',100),fetchKlines(sym,'Min5',100)]);
-    const a4=analyze(k4),a1=analyze(k1),a15=analyze(k15),a5=analyze(k5),sc=scoreTF(a4,a1,a15,a5);
-    if(sc.type!=='WAIT'&&sc.score>=min){
-     const entry=a5.price,dist=Math.max((a5.atr||entry*.005)*1.5,entry*.001);
-     const side=sc.type.includes('LONG')?'LONG':'SHORT',stop=side==='LONG'?entry-dist:entry+dist;
-     const cs=contractSize(sym),r=calcPositionValues(entry,stop,side,cs);
-     if(!r.error){found.push({...sc,symbol:sym,entry,stop,tp1:side==='LONG'?entry+dist:entry-dist,tp2:side==='LONG'?entry+dist*2:entry-dist*2,...r})}
+
+export default {
+  async fetch(request) {
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    };
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders
+      });
     }
-   }catch(e){errors.push(sym+': '+e.message)}
-   await wait(120);
+
+    const incoming = new URL(request.url);
+    const target = incoming.searchParams.get("url");
+
+    // Worker health check
+    if (!target) {
+      return new Response(JSON.stringify({
+        success: true,
+        worker: "SHAKIL",
+        exchange: "MEXC",
+        message: "Worker is running"
+      }), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json; charset=utf-8"
+        }
+      });
+    }
+
+    let targetURL;
+
+    try {
+      targetURL = new URL(target);
+    } catch {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Invalid target URL"
+      }), {
+        status: 400,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
+      });
+    }
+
+    // Only allow the official MEXC contract API
+    if (
+      targetURL.protocol !== "https:" ||
+      targetURL.hostname !== "contract.mexc.com" ||
+      !targetURL.pathname.startsWith("/api/v1/")
+    ) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Target not allowed"
+      }), {
+        status: 403,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
+      });
+    }
+
+    try {
+      const upstream = await fetch(targetURL.toString(), {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "User-Agent": "Mozilla/5.0"
+        }
+      });
+
+      const responseHeaders = new Headers(corsHeaders);
+      responseHeaders.set(
+        "Content-Type",
+        upstream.headers.get("Content-Type") || "application/json"
+      );
+      responseHeaders.set("Cache-Control", "no-store");
+
+      const body = await upstream.text();
+
+      return new Response(body, {
+        status: upstream.status,
+        headers: responseHeaders
+      });
+
+    } catch (error) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "MEXC connection failed",
+        details: String(error)
+      }), {
+        status: 502,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
+      });
+    }
   }
-  found.sort((a,b)=>b.score-a.score);lastSignals=found;
-  $('signalCount').textContent=found.length;$('dashboardSignals').innerHTML=found.slice(0,4).map(signalHTML).join('')||'<div class="empty">در این اسکن سیگنالی با شرایط انتخابی پیدا نشد.</div>';
-  $('scanResults').innerHTML=found.map(signalHTML).join('')||'<div class="empty">سیگنال واجد شرایطی یافت نشد. می‌توانید تعداد نمادها را بیشتر یا حداقل امتیاز را کمتر کنید.</div>';
-  $('scanStatus').textContent=`پایان اسکن: ${found.length} سیگنال از ${Math.min(limit,sorted.length)} نماد. خطاهای نمادها: ${errors.length}`;
-  $('marketMessage').textContent='آخرین اسکن: '+new Date().toLocaleTimeString('fa-IR')+' | خطاهای دریافت: '+errors.length;
- }catch(e){$('scanResults').innerHTML=`<div class="empty">خطا در اسکن: ${e.message}</div>`;$('scanStatus').textContent='اسکن ناموفق بود';$('marketMessage').textContent=e.message}
- finally{btn.disabled=false;btn.textContent='شروع اسکن'}
-}
-function initCharts(){
- if(!window.LightweightCharts)throw new Error('کتابخانه نمودار بارگذاری نشده؛ اینترنت یا فیلترشکن را بررسی کنید.');
- if(chart)chart.remove();if(rsiChart)rsiChart.remove();
- chart=LightweightCharts.createChart($('priceChart'),{height:270,layout:{background:{color:'#141414'},textColor:'#999'},grid:{vertLines:{color:'#242424'},horzLines:{color:'#242424'}},rightPriceScale:{borderColor:'#333'},timeScale:{borderColor:'#333',timeVisible:true}});
- candleSeries=chart.addCandlestickSeries({upColor:'#00c875',downColor:'#ff405e',borderVisible:false,wickUpColor:'#00c875',wickDownColor:'#ff405e'});
- rsiChart=LightweightCharts.createChart($('rsiChart'),{height:120,layout:{background:{color:'#141414'},textColor:'#999'},grid:{vertLines:{color:'#242424'},horzLines:{color:'#242424'}},rightPriceScale:{borderColor:'#333'},timeScale:{visible:false}});
- rsiSeries=rsiChart.addLineSeries({color:'#9b7bea',lineWidth:2});
- chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r)rsiChart.timeScale().setVisibleLogicalRange(r)});
-}
-async function loadChart(){
- const sym=$('chartSymbol').value,tf=$('chartTF').value;if(!sym)return;
- $('indicatorSummary').textContent='در حال دریافت نمودار...';
- try{const k=await fetchKlines(sym,tf,180);if(k.length<20)throw new Error('داده کندل کافی نیست');
-  if(!chart)initCharts();candleSeries.setData(k.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close})));chart.timeScale().fitContent();
-  const vals=rsi(k.map(x=>x.close));rsiSeries.setData(k.map((x,i)=>({time:x.time,value:vals[i]})).filter(x=>x.value!==null));rsiChart.timeScale().fitContent();
-  const a=analyze(k);$('indicatorSummary').textContent=`قیمت: ${fmt(a.price)} | RSI(14): ${fmt(a.rsi,2)} | EMA20: ${fmt(a.ema20)} | EMA50: ${fmt(a.ema50)}`;
- }catch(e){$('indicatorSummary').textContent='خطای نمودار: '+e.message}
-}
-function addWhale(side,price,qty,symbol,cs){
- const value=price*qty*cs,threshold=Number($('whaleThreshold').value)||5000;if(value<threshold)return;
- const html=`<div class="item"><div class="itemhead"><span class="${side==='BUY'?'good':'bad'}">${side==='BUY'?'خرید':'فروش'} | ${symbol}</span><span class="tag">${fmt(value,0)} USDT</span></div><div class="details"><div>قیمت: <b>${fmt(price)}</b></div><div>حجم قرارداد: <b>${fmt(qty,3)}</b></div></div></div>`;
- if($('whaleList').querySelector('.empty'))$('whaleList').innerHTML='';
- $('whaleList').insertAdjacentHTML('afterbegin',html);while($('whaleList').children.length>30)$('whaleList').lastChild.remove();
- if($('dashboardWhales').querySelector('.empty'))$('dashboardWhales').innerHTML='';
- $('dashboardWhales').insertAdjacentHTML('afterbegin',html);while($('dashboardWhales').children.length>4)$('dashboardWhales').lastChild.remove();
-}
-function connectWhales(){
- const sym=$('whaleSymbol').value;if(!sym){toast('ابتدا نماد را انتخاب کنید');return}
- if(ws){try{ws.close()}catch(e){}ws=null}
- if(whaleTimer){clearInterval(whaleTimer);whaleTimer=null}
- const c=contracts.find(x=>x.symbol===sym),cs=Number(c?.contractSize)||1;
- $('whaleStatus').textContent='در حال اتصال به دفتر سفارش...';
- $('whaleList').innerHTML='<div class="empty">در انتظار داده دفتر سفارش...</div>';
- try{
-  ws=new WebSocket('wss://contract.mexc.com/edge');
-  ws.onopen=()=>{
-   ws.send(JSON.stringify({method:'sub.depth.full',param:{symbol:sym,limit:20},id:Date.now()}));
-   whaleTimer=setInterval(()=>{if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({method:'ping'}))},20000);
-   $('whaleStatus').textContent='متصل؛ سفارش‌های بازِ قابل مشاهده (نه معاملات انجام‌شده)';
-  };
-  ws.onmessage=ev=>{try{
-   const m=JSON.parse(ev.data);
-   if(m.channel==='push.depth.full'&&m.data){
-    (m.data.bids||[]).forEach(x=>addWhale('BUY',+x[0],+x[1],sym,cs));
-    (m.data.asks||[]).forEach(x=>addWhale('SELL',+x[0],+x[1],sym,cs));
-   }
-   if(m.channel==='rs.error')$('whaleStatus').textContent='خطای اشتراک: '+(m.data||'نامشخص');
-  }catch(e){}};
-  ws.onerror=()=>{$('whaleStatus').textContent='خطای WebSocket؛ ممکن است اتصال مستقیم بازار مسدود باشد'};
-  ws.onclose=()=>{if(whaleTimer){clearInterval(whaleTimer);whaleTimer=null}$('whaleStatus').textContent='اتصال دفتر سفارش قطع شد'};
- }catch(e){$('whaleStatus').textContent=e.message}
-}
-function saveRisk(){
- const vals={capital:+$('capital').value,perTrade:+$('riskTrade').value,leverage:+$('leverage').value,maxRiskPct:+$('maxRisk').value};
- if(!(vals.capital>0&&vals.perTrade>0&&vals.leverage>=1&&vals.leverage<=125&&vals.maxRiskPct>0&&vals.maxRiskPct<=100)){toast('مقادیر ریسک معتبر نیستند');return}
- RISK=vals;localStorage.setItem('shakilRisk',JSON.stringify(RISK));toast('تنظیمات ریسک ذخیره شد');
-}
-function calculate(){
- const entry=Number($('entry').value),stop=Number($('stop').value),side=$('calcSide').value,cs=Number($('contractSize').value);
- const r=calcPositionValues(entry,stop,side,cs);
- if(r.error){$('calcResult').innerHTML='<span class="bad">'+r.error+'</span>';return}
- $('calcResult').innerHTML=`<div class="grid"><div class="stat"><small>تعداد قرارداد</small><b>${fmt(r.qty,4)}</b></div><div class="stat"><small>ارزش پوزیشن</small><b>${fmt(r.notional,2)}</b></div><div class="stat"><small>مارجین تقریبی</small><b>${fmt(r.margin,2)}</b></div><div class="stat"><small>زیان با کارمزد</small><b class="bad">${fmt(r.total,3)}</b></div></div><div class="note">زیان قیمتی: ${fmt(r.grossLoss,3)} USDT | کارمزد تخمینی رفت‌وبرگشت: ${fmt(r.fees,3)} USDT. کارمزد واقعی و لغزش قیمت ممکن است متفاوت باشد.</div>`;
-}
-async function testConnection(){
- $('apiDiagnostic').textContent='در حال آزمایش API...';
- try{const r=await api('/contract/detail');const n=Array.isArray(r.data)?r.data.length:0;if(!n)throw new Error('پاسخ دریافت شد اما فهرست قراردادها خالی است');setConn(true);$('apiDiagnostic').textContent=`اتصال API موفق است. تعداد قراردادهای دریافتی: ${n}`;toast('اتصال API موفق بود')}
- catch(e){$('apiDiagnostic').textContent='آزمایش ناموفق: '+e.message+' | اگر HTTP 403 دریافت می‌شود، مشکل از دسترسی سمت MEXC یا Worker است، نه ظاهر صفحه.';setConn(false);toast('اتصال API ناموفق بود')}
-}
-$('tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-page]');if(!b)return;document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id===b.dataset.page));if(b.dataset.page==='chart'&&$('chartSymbol').value)loadChart()});
-$('scanBtn').addEventListener('click',scan);
-$('whaleBtn').addEventListener('click',connectWhales);
-$('chartSymbol').addEventListener('change',loadChart);$('chartTF').addEventListener('change',loadChart);
-$('saveRisk').addEventListener('click',saveRisk);$('calcBtn').addEventListener('click',calculate);
-$('testProxy').addEventListener('click',testConnection);
-$('saveProxy').addEventListener('click',()=>{const v=normalizeProxy($('proxyInput').value);if(v&&!/^https:\/\/.+/.test(v)){toast('آدرس باید با https:// شروع شود');return}if(v)localStorage.setItem('shakilProxy',v);else localStorage.removeItem('shakilProxy');$('proxyInput').value=v;toast('آدرس ذخیره شد');testConnection()});
-async function init(){
- $('capital').value=RISK.capital;$('riskTrade').value=RISK.perTrade;$('leverage').value=RISK.leverage;$('maxRisk').value=RISK.maxRiskPct;
- $('proxyInput').value=localStorage.getItem('shakilProxy')||'';
- try{await fetchContracts();setConn(true);$('marketMessage').textContent='فهرست قراردادها با موفقیت دریافت شد.';await fetchTickers()}
- catch(e){setConn(false);$('marketMessage').textContent='دریافت قراردادها ناموفق: '+e.message}
-}
-init();
-</script>
-</body>
-</html>
+};
