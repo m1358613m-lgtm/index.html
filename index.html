@@ -1,508 +1,178 @@
-<!DOCTYPE html>  <html lang="fa" dir="rtl">  
-<head>  
-<meta charset="UTF-8">  
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">  
-<title>Shakil Trade Analyzer</title>  
-<link rel="manifest" href="manifest.json">  
-<meta name="theme-color" content="#0a0a0a">  
-<style>  
-:root{--bg:#0a0a0a;--card:#141414;--card2:#1a1a1a;--border:#2a2a2a;--gold:#d4af37;--gold-dim:#8a6d1f;--text:#e8e8e8;--text-dim:#888;--green:#00c853;--red:#ff1744;--turquoise:#00bcd4;--yellow:#ffc107;--gray:#666;--radius:12px}  
-*{margin:0;padding:0;box-sizing:border-box;font-family:'Vazirmatn','Segoe UI',Tahoma,sans-serif}  
-body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}  
-.app-header{background:linear-gradient(135deg,#1a1a1a,#0f0f0f);border-bottom:1px solid var(--gold-dim);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}  
-.app-header h1{font-size:16px;background:linear-gradient(90deg,var(--gold),#f5e6a3);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:800}  
-.status-dot{width:9px;height:9px;border-radius:50%;background:var(--gray);display:inline-block;margin-left:5px;transition:background .3s}  
-.status-dot.online{background:var(--green);box-shadow:0 0 6px var(--green)}  
-.status-dot.offline{background:var(--red);box-shadow:0 0 6px var(--red)}  
-.nav-tabs{display:flex;overflow-x:auto;gap:4px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);scrollbar-width:none}  
-.nav-tabs::-webkit-scrollbar{display:none}  
-.nav-tab{padding:7px 13px;border-radius:18px;background:transparent;border:1px solid var(--border);color:var(--text-dim);font-size:11px;white-space:nowrap;cursor:pointer;transition:all .2s}  
-.nav-tab.active{background:var(--gold);color:#000;border-color:var(--gold);font-weight:700}  
-.page{display:none;padding:14px;padding-bottom:80px}  
-.page.active{display:block}  
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}  
-.card-title{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px;display:flex;align-items:center;gap:6px}  
-.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}  
-.stat-item{background:var(--card2);border-radius:8px;padding:9px;text-align:center}  
-.stat-label{font-size:10px;color:var(--text-dim);margin-bottom:3px}  
-.stat-value{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}  
-.stat-value.green{color:var(--green)}.stat-value.red{color:var(--red)}.stat-value.gold{color:var(--gold)}  
-.signal-card{border-radius:var(--radius);padding:12px;margin-bottom:9px;border:1px solid var(--border);background:var(--card);border-right:3px solid var(--gray)}  
-.signal-card.LONG{border-right-color:var(--green)}.signal-card.SHORT{border-right-color:var(--red)}  
-.signal-card.SETUP_LONG{border-right-color:var(--turquoise)}.signal-card.SETUP_SHORT{border-right-color:var(--yellow)}  
-.signal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}  
-.signal-symbol{font-weight:800;font-size:14px}  
-.signal-badge{font-size:9px;padding:2px 7px;border-radius:9px;font-weight:700}  
-.badge-LONG{background:rgba(0,200,83,.15);color:var(--green)}.badge-SHORT{background:rgba(255,23,68,.15);color:var(--red)}  
-.badge-SETUP_LONG{background:rgba(0,188,212,.15);color:var(--turquoise)}.badge-SETUP_SHORT{background:rgba(255,193,7,.15);color:var(--yellow)}  
-.badge-WAIT{background:rgba(102,102,102,.2);color:var(--gray)}  
-.signal-details{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:10px;color:var(--text-dim)}  
-.signal-details span{color:var(--text)}  
-.whale-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}  
-.whale-item:last-child{border-bottom:none}  
-.whale-side-buy{color:var(--green)}.whale-side-sell{color:var(--red)}  
-.whale-size{font-weight:700}  
-.form-group{margin-bottom:10px}  
-.form-group label{display:block;font-size:11px;color:var(--text-dim);margin-bottom:3px}  
-/* استایل برای چپ‌چین کردن کادر پروکسی */  
-.form-group input,.form-group select{width:100%;padding:9px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px;outline:none}  
-.form-group input.ltr-input { direction: ltr; text-align: left; }  
-.form-group input:focus{border-color:var(--gold)}  
-.btn{width:100%;padding:11px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s}  
-.btn-gold{background:linear-gradient(135deg,var(--gold),#b8960c);color:#000}  
-.btn-outline{background:transparent;border:1px solid var(--gold);color:var(--gold)}  
-.btn-sm{padding:7px 11px;font-size:11px;width:auto}  
-.btn:disabled{opacity:.5;cursor:not-allowed}  
-#chart-container{width:100%;height:280px;border-radius:8px;overflow:hidden}  
-#rsi-container{width:100%;height:120px;border-radius:8px;overflow:hidden;margin-top:6px}  
-.loading{display:flex;justify-content:center;align-items:center;gap:8px;padding:30px;color:var(--text-dim);font-size:12px}  
-.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite}  
-@keyframes spin{to{transform:rotate(360deg)}}  
-.toast{position:fixed;bottom:75px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--gold);padding:9px 18px;border-radius:18px;font-size:11px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}  
-.toast.show{opacity:1}  
-.empty-state{text-align:center;padding:24px;color:var(--text-dim);font-size:12px;line-height:1.7}  
-</style>  
-</head>  
-<body>  <header class="app-header">  
-  <h1>Shakil Trade Analyzer</h1>  
-  <div><span class="status-dot" id="connDot"></span><span style="font-size:10px;color:var(--text-dim)" id="connText">اتصال...</span></div>  
-</header>  <nav class="nav-tabs">  
-  <button class="nav-tab active" data-page="dashboard">داشبورد</button>  
-  <button class="nav-tab" data-page="scanner">اسکنر</button>  
-  <button class="nav-tab" data-page="orderbook">سفارشات سنگین</button>  
-  <button class="nav-tab" data-page="technical">نمودار</button>  
-  <button class="nav-tab" data-page="risk">مدیریت ریسک</button>  
-  <button class="nav-tab" data-page="settings">تنظیمات</button>  
-</nav>  <div class="page active" id="page-dashboard">  
-  <div class="card">  
-    <div class="card-title">📊 وضعیت بازار</div>  
-    <div class="stat-grid">  
-      <div class="stat-item"><div class="stat-label">قراردادها</div><div class="stat-value gold" id="statContracts">—</div></div>  
-      <div class="stat-item"><div class="stat-label">سیگنال فعال</div><div class="stat-value green" id="statSignals">—</div></div>  
-    </div>  
-  </div>  
-  <div class="card">  
-    <div class="card-title">🐋 سفارشات سنگین اخیر</div>  
-    <div id="whaleDashboard"><div class="empty-state">در حال دریافت...</div></div>  
-  </div>  
-  <div class="card">  
-    <div class="card-title">📈 آخرین سیگنال‌ها</div>  
-    <div id="recentSignals"><div class="empty-state">هنوز اسکنی انجام نشده</div></div>  
-  </div>  
-</div>  <div class="page" id="page-scanner">  
-  <div class="card">  
-    <div class="card-title">🔍 اسکن چندتایم‌فریمی</div>  
-    <div class="form-group"><label>تعداد نمادهای اسکن</label><input type="number" id="scanLimit" value="15" min="3" max="40"></div>  
-    <button class="btn btn-gold" id="btnScan" onclick="startScan()">شروع اسکن</button>  
-    <div style="margin-top:6px;font-size:10px;color:var(--text-dim)" id="scanStatus">آماده</div>  
-  </div>  
-  <div id="scanResults"><div class="empty-state">برای شروع، دکمه اسکن را بزنید</div></div>  
-</div>  <div class="page" id="page-orderbook">  
-  <div class="card">  
-    <div class="card-title">🐋 تشخیص سفارشات سنگین</div>  
-    <div class="form-group"><label>آستانه حجم سفارش (USDT)</label><input type="number" id="whaleThreshold" value="5000" min="100" step="1000"></div>  
-    <div class="form-group"><label>نماد</label><select id="whaleSymbolSelect"></select></div>  
-    <button class="btn btn-gold" onclick="connectWhaleWS()">اتصال و رصد</button>  
-    <div style="margin-top:6px;font-size:10px;color:var(--text-dim)" id="whaleStatus">قطع</div>  
-  </div>  
-  <div class="card">  
-    <div class="card-title">📋 سفارشات شناسایی‌شده</div>  
-    <div id="whaleList"><div class="empty-state">هنوز سفارش سنگینی شناسایی نشده</div></div>  
-  </div>  
-</div>  <div class="page" id="page-technical">  
-  <div class="card">  
-    <div class="card-title">📉 نمودار قیمت + RSI</div>  
-    <select id="symbolSelect" style="width:100%;padding:9px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text);margin-bottom:10px;font-size:12px"></select>  
-    <div id="chart-container"></div>  
-    <div id="rsi-container"></div>  
-    <div style="font-size:10px;color:var(--text-dim);margin-top:4px" id="indicatorSummary">—</div>  
-  </div>  
-</div>  <div class="page" id="page-risk">  
-  <div class="card">  
-    <div class="card-title">💰 پارامترهای ریسک</div>  
-    <div class="form-group"><label>سرمایه (USDT)</label><input type="number" id="riskCapital" value="50" min="1"></div>  
-    <div class="form-group"><label>ریسک هر معامله (USDT)</label><input type="number" id="riskPerTrade" value="1" min="0.1" step="0.1"></div>  
-    <div class="form-group"><label>اهرم</label><input type="number" id="riskLeverage" value="20" min="1" max="125"></div>  
-    <div class="form-group"><label>حداکثر ریسک (% سرمایه)</label><input type="number" id="riskMaxPct" value="30" min="1" max="100"></div>  
-    <button class="btn btn-gold" onclick="saveRiskSettings()">ذخیره</button>  
-  </div>  
-  <div class="card">  
-    <div class="card-title">🧮 ماشین‌حساب پوزیشن</div>  
-    <div class="form-group"><label>قیمت ورود</label><input type="number" id="calcEntry" step="any" placeholder="مثال: 0.0234"></div>  
-    <div class="form-group"><label>حد ضرر</label><input type="number" id="calcSL" step="any" placeholder="مثال: 0.0225"></div>  
-    <button class="btn btn-outline" onclick="calcPosition()">محاسبه</button>  
-    <div id="calcResult" style="margin-top:10px"></div>  
-  </div>  
-</div>  <div class="page" id="page-settings">  
-  <div class="card">  
-    <div class="card-title">⚙️ تنظیمات پروکسی</div>  
-    <div class="form-group">  
-      <label>لینک پروکسی اختصاصی (بدون ?url= وارد کنید)</label>  
-      <!-- کلاس ltr-input اضافه شد تا متن از چپ به راست چیده شود -->  
-      <input type="text" id="proxyInput" class="ltr-input" placeholder="https://shakil.m1358613m.workers.dev/">  
-      <div style="font-size:10px;color:var(--text-dim);margin-top:4px">فقط لینک اصلی کلودفلر را وارد کنید. برنامه خودش بقیه را تنظیم می‌کند.</div>  
-    </div>  
-    <button class="btn btn-gold" onclick="saveSettings()">ذخیره تنظیمات</button>  
-  </div>  
-</div>  <div class="toast" id="toast"></div>  
-<script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>  
-<script>  
-// ==================== MEXC API Config ====================  
-const API_BASE = 'https://contract.mexc.com';  
-const PUB = '/api/v1';  const AUTO_PROXIES = [
-'https://api.allorigins.win/raw?url=',
-'https://corsproxy.io/?',
-'https://proxy.cors.dev/'
-];
 
-let RISK = JSON.parse(localStorage.getItem('riskSettings')) || { capital:50, perTrade:1, leverage:20, maxRiskPct:30 };
-let WHALE_THRESHOLD = parseFloat(localStorage.getItem('whaleThreshold')) || 5000;
-let wsWhale = null;
+export default {
+  async fetch(request) {
+    const cors = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "*",
+      "Content-Type": "application/json; charset=utf-8"
+    };
 
-const $ = id => document.getElementById(id);
-function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
-function fmt(n,d=4){ return (n===null||n===undefined||isNaN(n))?'—':Number(n).toFixed(d); }
-function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-function setConn(ok){ $('connDot').className='status-dot '+(ok?'online':'offline'); $('connText').textContent=ok?'متصل':'قطع'; }
+    const json = (data, status = 200) =>
+      new Response(JSON.stringify(data), {
+        status,
+        headers: cors
+      });
 
-// ==================== API Fetch ====================
-async function apiFetch(path, params={}){
-let targetUrl = API_BASE + PUB + path;
-const qs = new URLSearchParams(params).toString();
-if(qs) targetUrl += '?' + qs;
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: cors });
+    }
 
-const userProxy = localStorage.getItem('proxyUrl');
-let proxiesToTry = userProxy ? [userProxy] : AUTO_PROXIES;
+    if (request.method !== "GET") {
+      return json({ success: false, error: "GET only" }, 405);
+    }
 
-for(let proxy of proxiesToTry) {
-// اگر پروکسی از کلودفلر باشد، نیاز به کدگذاری ندارد، اما پروکسی‌های عمومی دارند
-let url = proxy ? proxy + encodeURIComponent(targetUrl) : targetUrl;
-const ctrl = new AbortController();
-const timer = setTimeout(()=>ctrl.abort(), 10000);
-try {
-const res = await fetch(url, {signal:ctrl.signal});
-clearTimeout(timer);
-if(res.ok) {
-setConn(true);
-return await res.json();
-}
-} catch(e) {
-console.warn('تلاش ناموفق با پروکسی:', proxy);
-}
-}
-setConn(false);
-throw new Error('عدم دسترسی به سرور. لطفاً فیلترشکن را روشن کنید یا پروکسی را بررسی کنید.');
-}
+    const BASE = "https://contract.mexc.com";
+    const url = new URL(request.url);
 
-async function fetchInstruments(){
-const data = await apiFetch('/contract/detail');
-const list = data.data || [];
-return list.filter(c => c.symbol && c.symbol.endsWith('USDT'));
-}
+    async function mexc(path) {
+      const response = await fetch(BASE + path, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "User-Agent": "Mozilla/5.0"
+        }
+      });
 
-async function fetchKlines(symbol, interval, limit=200){
-const intervalMap = {'1m':'Min1','5m':'Min5','15m':'Min15','1h':'Hour1','4h':'Hour4'};
-const intervalParam = intervalMap[interval] || 'Hour1';
-const data = await apiFetch('/contract/kline/' + symbol, {interval:intervalParam, limit:limit});
-if(!data.data || !data.data.time) return [];
+      const body = await response.text();
 
-const times = data.data.time;
-const opens = data.data.open;
-const highs = data.data.high;
-const lows = data.data.low;
-const closes = data.data.close;
-const vols = data.data.vol;
+      if (!response.ok) {
+        throw new Error("MEXC HTTP " + response.status + ": " + body.slice(0, 500));
+      }
 
-return times.map((t, i) => ({
-time: Math.floor(t),
-open: +opens[i],
-high: +highs[i],
-low: +lows[i],
-close: +closes[i],
-volume: +vols[i]
-})).sort((a,b)=>a.time-b.time);
-}
+      let data;
+      try {
+        data = JSON.parse(body);
+      } catch {
+        throw new Error("Invalid MEXC JSON response");
+      }
 
-// ==================== Indicators ====================
-function EMA(data, len){ const k=2/(len+1); let prev=null; const out=[]; data.forEach((v,i)=>{ if(i<len-1){out.push(null);return;} if(prev===null) prev=data.slice(0,len).reduce((a,b)=>a+b,0)/len; else prev=vk+prev(1-k); out.push(prev); }); return out; }
-function RSI(closes, len=14){ const out=[null]; let ag=0,al=0; for(let i=1;i<closes.length;i++){ const ch=closes[i]-closes[i-1]; if(i<=len){ag+=Math.max(ch,0);al+=Math.max(-ch,0); if(i===len){ag/=len;al/=len;} out.push(null);} else {ag=(ag*(len-1)+Math.max(ch,0))/len; al=(al*(len-1)+Math.max(-ch,0))/len; out.push(al===0?100:100-100/(1+ag/al));} } return out; }
-function ATR(h,l,c,len=14){ const tr=h.map((v,i)=>i===0?v-l[i]:Math.max(v-l[i],Math.abs(v-c[i-1]),Math.abs(l[i]-c[i-1]))); let a=tr.slice(0,len).reduce((x,y)=>x+y,0)/len; const out=[null]; for(let i=1;i<c.length;i++){ if(i<len){out.push(null);continue;} if(i===len) out.push(a); else {a=(a*(len-1)+tr[i])/len; out.push(a);} } return out; }
-function MACD(closes,f=12,s=26,sig=9){ const ef=EMA(closes,f), es=EMA(closes,s); const line=closes.map((_,i)=>(ef[i]!==null&&es[i]!==null)?ef[i]-es[i]:null); const valid=line.filter(v=>v!==null); const sl=EMA(valid,sig); let idx=0; const sigLine=line.map(v=>v===null?null:(sl[idx++]??null)); const hist=line.map((v,i)=>(v!==null&&sigLine[i]!==null)?v-sigLine[i]:null); return {macd:line,signal:sigLine,hist}; }
+      if (data.success === false) {
+        throw new Error(data.message || data.msg || "MEXC API error");
+      }
 
-function analyzeTF(klines){
-if(!klines || klines.length<50) return null;
-const closes=klines.map(k=>k.close), highs=klines.map(k=>k.high), lows=klines.map(k=>k.low), vols=klines.map(k=>k.volume);
-const ema20=EMA(closes,20), ema50=EMA(closes,50);
-const rsi=RSI(closes,14); const atr=ATR(highs,lows,closes,14); const macd=MACD(closes);
-const last=closes.length-1; const price=closes[last];
-const volAvg=vols.slice(-20).reduce((a,b)=>a+b,0)/20;
-return {
-price, trendUp: ema20[last]>ema50[last] && price>ema20[last],
-trendDown: ema20[last]<ema50[last] && price<ema20[last],
-rsi:rsi[last], atr:atr[last], macdHist:macd.hist[last],
-volRatio: vols[last]/(volAvg||1), ema20:ema20[last], ema50:ema50[last]
+      return data;
+    }
+
+    try {
+      // Health check
+      if (url.pathname === "/" || url.pathname === "/health") {
+        return json({
+          success: true,
+          worker: "SHAKIL",
+          exchange: "MEXC",
+          version: "COMPATIBLE-2",
+          routes: ["/contracts", "/tickers", "/market", "/kline"],
+          message: "Worker is running"
+        });
+      }
+
+      // Backward-compatible URL proxy
+      const target = url.searchParams.get("url");
+
+      if (target) {
+        const parsed = new URL(target);
+
+        if (
+          parsed.protocol !== "https:" ||
+          parsed.hostname !== "contract.mexc.com" ||
+          !parsed.pathname.startsWith("/api/v1/")
+        ) {
+          return json({
+            success: false,
+            error: "Invalid proxy URL"
+          }, 403);
+        }
+
+        const response = await fetch(parsed.toString(), {
+          headers: { "Accept": "application/json" }
+        });
+
+        return new Response(response.body, {
+          status: response.status,
+          headers: {
+            ...cors,
+            "Content-Type":
+              response.headers.get("Content-Type") ||
+              "application/json"
+          }
+        });
+      }
+
+      // Contract list
+      if (url.pathname === "/contracts") {
+        return json(await mexc("/api/v1/contract/detail"));
+      }
+
+      // Tickers
+      if (url.pathname === "/tickers") {
+        return json(await mexc("/api/v1/contract/ticker"));
+      }
+
+      // Combined market data
+      if (url.pathname === "/market") {
+        const [contracts, tickers] = await Promise.all([
+          mexc("/api/v1/contract/detail"),
+          mexc("/api/v1/contract/ticker")
+        ]);
+
+        return json({
+          success: true,
+          contracts,
+          tickers
+        });
+      }
+
+      // Candlesticks
+      if (url.pathname === "/kline") {
+        const symbol = url.searchParams.get("symbol") || "BTC_USDT";
+        const interval = url.searchParams.get("interval") || "Min5";
+
+        if (!/^[A-Z0-9_]{3,30}$/.test(symbol)) {
+          return json({ success: false, error: "Invalid symbol" }, 400);
+        }
+
+        const allowed = [
+          "Min1", "Min5", "Min15", "Min30",
+          "Min60", "Hour4", "Hour8",
+          "Day1", "Week1", "Month1"
+        ];
+
+        if (!allowed.includes(interval)) {
+          return json({ success: false, error: "Invalid interval" }, 400);
+        }
+
+        const params = new URLSearchParams();
+
+        for (const key of ["start", "end"]) {
+          const value = url.searchParams.get(key);
+          if (value && /^\d+$/.test(value)) {
+            params.set(key, value);
+          }
+        }
+
+        const query = params.toString();
+        const path =
+          "/api/v1/contract/kline/" +
+          encodeURIComponent(symbol) +
+          "?interval=" + encodeURIComponent(interval) +
+          (query ? "&" + query : "");
+
+        return json(await mexc(path));
+      }
+
+      return json({
+        success: false,
+        error: "Unknown endpoint",
+        available: ["/", "/health", "/contracts", "/tickers", "/market", "/kline"]
+      }, 404);
+
+    } catch (error) {
+      return json({
+        success: false,
+        worker: "SHAKIL",
+        error: String(error.message || error)
+      }, 502);
+    }
+  }
 };
-}
-
-// ==================== Logic ====================
-function scoreSignal(a4h, a1h, a15m, a5m){
-if(!a4h||!a1h||!a15m||!a5m) return {type:'WAIT', score:0, reason:'داده ناقص'};
-let score=0, bullish=0, bearish=0;
-if(a4h.trendUp){ score+=25; bullish++; } else if(a4h.trendDown){ score+=25; bearish++; }
-if(a1h.trendUp && bullish>0){ score+=20; bullish++; } else if(a1h.trendDown && bearish>0){ score+=20; bearish++; }
-if(a15m.rsi>50 && a15m.macdHist>0){ score+=15; bullish++; } else if(a15m.rsi<50 && a15m.macdHist<0){ score+=15; bearish++; }
-if(a5m.rsi>50 && a5m.macdHist>0){ score+=15; bullish++; } else if(a5m.rsi<50 && a5m.macdHist<0){ score+=15; bearish++; }
-if(a5m.volRatio>1.2){ score+=10; }
-if(bullish>=3 && bearish<=1) { score+=15; } else if(bearish>=3 && bullish<=1) { score+=15; } else { score = Math.max(0, score-10); }
-const type = score>=70 ? (bullish>bearish?'LONG':'SHORT') : score>=50 ? (bullish>bearish?'SETUP_LONG':'SETUP_SHORT') : 'WAIT';
-return {type, score:Math.min(100,Math.max(0,score)), bullish, bearish};
-}
-
-function calcRiskSignal(signal){
-const capital=RISK.capital, perTrade=Math.min(RISK.perTrade, capital*(RISK.maxRiskPct/100));
-const riskPerUnit=Math.abs(signal.entry-signal.stopLoss);
-if(riskPerUnit<=0) return null;
-const qty=perTrade/riskPerUnit, notional=qtysignal.entry, margin=notional/RISK.leverage;
-const feeRate=0.0006; const totalFee=notionalfeeRate2;
-const lossWithFee=perTrade+totalFee;
-if(lossWithFee>capital(RISK.maxRiskPct/100)) return {rejected:true, reason:'ریسک از سقف عبور می‌کند'};
-return {qty, notional, margin, totalFee, lossWithFee, rr1:Math.abs(signal.tp1-signal.entry)/riskPerUnit, rr2:Math.abs(signal.tp2-signal.entry)/riskPerUnit, rr3:Math.abs(signal.tp3-signal.entry)/riskPerUnit, rejected:false};
-}
-
-// ==================== UI Actions ====================
-async function startScan(){
-const btn=$('btnScan'); btn.disabled=true; btn.textContent='در حال اسکن...';
-$('scanResults').innerHTML='<div class="loading"><div class="spinner"></div>در حال دریافت داده‌ها...</div>';
-const limit=parseInt($('scanLimit').value)||15;
-try {
-const instruments=await fetchInstruments();
-$('statContracts').textContent=instruments.length;
-const symbols=instruments.slice(0,limit);
-const results=[];
-for(const ins of symbols){
-const sym=ins.symbol;
-try {
-const [k4h,k1h,k15m,k5m]=await Promise.all([
-fetchKlines(sym,'4h',100), fetchKlines(sym,'1h',100),
-fetchKlines(sym,'15m',100), fetchKlines(sym,'5m',100)
-]);
-const a4=analyzeTF(k4h), a1=analyzeTF(k1h), a15=analyzeTF(k15m), a5=analyzeTF(k5m);
-const scored=scoreSignal(a4,a1,a15,a5);
-if(scored.type!=='WAIT'){
-const price=a5?a5.price:(a15?a15.price:0);
-const atr=a5?a5.atr:(a15?a15.atr:price0.01);
-const slDist=atr1.5;
-let entry=price, sl, tp1, tp2, tp3;
-if(scored.type.includes('LONG')){ sl=entry-slDist; tp1=entry+slDist; tp2=entry+slDist2; tp3=entry+slDist3; }
-else { sl=entry+slDist; tp1=entry-slDist; tp2=entry-slDist2; tp3=entry-slDist3; }
-const sig={...scored, symbol:sym, entry, stopLoss:sl, tp1, tp2, tp3, atr, price};
-const risk=calcRiskSignal(sig);
-if(!risk||risk.rejected){ sig.type='WAIT'; sig.reason=risk?risk.reason:'خطای ریسک'; }
-else Object.assign(sig, risk);
-if(sig.type!=='WAIT') results.push(sig);
-}
-await sleep(150);
-} catch(e){ console.warn(sym,e.message); }
-}
-renderScan(results);
-$('scanStatus').textContent=${results.length} سیگنال از ${limit} نماد;
-updateDashboard(results);
-} catch(e){
-$('scanResults').innerHTML=<div class="empty-state">خطا: ${e.message}<br><small>لطفاً فیلترشکن را روشن کنید.</small></div>;
-} finally { btn.disabled=false; btn.textContent='شروع اسکن'; }
-}
-
-function renderScan(results){
-if(!results.length){ $('scanResults').innerHTML='<div class="empty-state">سیگنال تأییدشده‌ای یافت نشد</div>'; return; }
-results.sort((a,b)=>b.score-a.score);
-$('scanResults').innerHTML=results.map(s=>signalCardHTML(s)).join('');
-}
-
-function signalCardHTML(s){
-const cls=s.type.includes('LONG')?'LONG':s.type.includes('SHORT')?'SHORT':'WAIT';
-return `<div class="signal-card ${cls}">
-<div class="signal-header"><span class="signal-symbol">${s.symbol}</span><span class="signal-badge badge-${s.type}">${s.type.replace('_',' ')}</span></div>
-<div class="signal-details">
-<div>ورود: <span>${fmt(s.entry)}</span></div><div>حد ضرر: <span>${fmt(s.stopLoss)}</span></div>
-<div>TP1: <span>${fmt(s.tp1)}</span></div><div>R:R: <span>${s.rr1?s.rr1.toFixed(2):'—'}</span></div>
-<div>حجم: <span>${s.qty?s.qty.toFixed(4):'—'}</span></div><div>مارجین: <span>${s.margin?s.margin.toFixed(2):'—'}</span></div>
-<div>ریسک: <span>${s.lossWithFee?s.lossWithFee.toFixed(2):'—'}</span></div><div>امتیاز: <span>${s.score}</span></div>
-</div>
-
-  </div>`;  
-}  function updateDashboard(results){
-$('statSignals').textContent=results.length;
-$('recentSignals').innerHTML=results.slice(0,3).map(s=>signalCardHTML(s)).join('')||'<div class="empty-state">سیگنالی نیست</div>';
-}
-
-// ==================== WebSocket ====================
-function connectWhaleWS(){
-if(wsWhale){ wsWhale.close(); wsWhale=null; }
-const sym=$('whaleSymbolSelect').value;
-if(!sym){ toast('نماد را انتخاب کنید'); return; }
-WHALE_THRESHOLD=parseFloat($('whaleThreshold').value)||5000;
-localStorage.setItem('whaleThreshold',WHALE_THRESHOLD);
-$('whaleStatus').textContent='در حال اتصال...';
-$('whaleList').innerHTML='<div class="loading"><div class="spinner"></div>در حال رصد...</div>';
-
-try {
-wsWhale=new WebSocket('wss://contract.mexc.com/ws');
-wsWhale.onopen=()=>{
-$('whaleStatus').textContent='متصل - در حال رصد';
-const sub={method:'sub.depth.full', param:{symbol:sym, limit:20}, id:Date.now()};
-wsWhale.send(JSON.stringify(sub));
-setInterval(()=>{ if(wsWhale&&wsWhale.readyState===1) wsWhale.send(JSON.stringify({method:'ping'})); }, 25000);
-};
-wsWhale.onmessage=(ev)=>{
-try {
-const msg=JSON.parse(ev.data);
-if(msg.channel === 'push.depth.full' && msg.data) {
-const book = msg.data;
-const processSide=(arr,side)=>{
-if(!arr) return;
-arr.forEach(lvl=>{
-const price=parseFloat(lvl[0]);
-const qty=parseFloat(lvl[1]);
-const notional=price*qty;
-if(notional>=WHALE_THRESHOLD){ addWhaleToUI({side, price, notional, symbol:sym}); }
-});
-};
-processSide(book.bids,'BUY'); processSide(book.asks,'SELL');
-}
-} catch(e){}
-};
-wsWhale.onerror=()=>{ $('whaleStatus').textContent='خطای اتصال (فیلترشکن را روشن کنید)'; };
-wsWhale.onclose=()=>{ $('whaleStatus').textContent='قطع شد'; };
-} catch(e){ toast('خطا در اتصال WebSocket'); }
-}
-
-function addWhaleToUI(w){
-const el=document.createElement('div'); el.className='whale-item';
-el.innerHTML=<span class="whale-side-${w.side==='BUY'?'buy':'sell'}">${w.side==='BUY'?'خرید':'فروش'}</span>   <span>${fmt(w.price)}</span><span class="whale-size">${fmt(w.notional,0)} USDT</span>;
-const list=$('whaleList');
-if(list.querySelector('.empty-state')) list.innerHTML='';
-list.prepend(el);
-if(list.children.length>25) list.lastChild.remove();
-const dash=$('whaleDashboard');
-if(dash.querySelector('.empty-state')) dash.innerHTML='';
-const clone=el.cloneNode(true); dash.prepend(clone);
-if(dash.children.length>5) dash.lastChild.remove();
-}
-
-// ==================== Charts ====================
-let chart=null, candleSeries=null, rsiChart=null, rsiSeries=null;
-
-function initCharts(){
-if(chart) chart.remove();
-if(rsiChart) rsiChart.remove();
-chart=LightweightCharts.createChart($('chart-container'),{
-layout:{background:{color:'#141414'},textColor:'#888'},
-grid:{vertLines:{color:'#1f1f1f'},horzLines:{color:'#1f1f1f'}},
-crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
-rightPriceScale:{borderColor:'#2a2a2a'},
-timeScale:{borderColor:'#2a2a2a',timeVisible:true}
-});
-candleSeries=chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderVisible:false,wickUpColor:'#00c853',wickDownColor:'#ff1744'});
-rsiChart=LightweightCharts.createChart($('rsi-container'),{
-layout:{background:{color:'#141414'},textColor:'#888'}, height:120,
-grid:{vertLines:{color:'#1f1f1f'},horzLines:{color:'#1f1f1f'}},
-rightPriceScale:{borderColor:'#2a2a2a'},
-timeScale:{borderColor:'#2a2a2a',timeVisible:true,visible:false}
-});
-rsiSeries=rsiChart.addLineSeries({color:'#7E57C2',lineWidth:2});
-chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{ if(r) rsiChart.timeScale().setVisibleLogicalRange(r); });
-}
-
-async function loadChart(symbol){
-try {
-const klines=await fetchKlines(symbol,'1h',200);
-if(!chart) initCharts();
-candleSeries.setData(klines.map(k=>({time:k.time,open:k.open,high:k.high,low:k.low,close:k.close})));
-chart.timeScale().fitContent();
-const closes=klines.map(k=>k.close);
-const rsiVals=RSI(closes,14);
-rsiSeries.setData(klines.map((k,i)=>({time:k.time,value:rsiVals[i]})).filter(v=>v.value!==null));
-const a=analyzeTF(klines);
-if(a) $('indicatorSummary').textContent=RSI: ${fmt(a.rsi,1)} | EMA20: ${fmt(a.ema20)} | EMA50: ${fmt(a.ema50)} | Volume Ratio: ${fmt(a.volRatio,2)};
-} catch(e){ toast('خطا در بارگذاری نمودار'); }
-}
-
-async function loadSymbols(){
-try {
-const ins=await fetchInstruments();
-const sel=$('symbolSelect'), wsel=$('whaleSymbolSelect');
-const opts=ins.map(i=><option value="${i.symbol}">${i.symbol}</option>).join('');
-sel.innerHTML=opts; wsel.innerHTML=opts;
-sel.onchange=()=>loadChart(sel.value);
-if(ins.length) loadChart(ins[0].symbol);
-} catch(e){ toast('خطا در دریافت نمادها'); }
-}
-
-// ==================== Risk Calc ====================
-function calcPosition(){
-const entry=parseFloat($('calcEntry').value), sl=parseFloat($('calcSL').value);
-if(!entry||!sl||entry===sl){ $('calcResult').innerHTML='<div class="empty-state">قیمت‌ها را صحیح وارد کنید</div>'; return; }
-const sig={entry,stopLoss:sl,tp1:entry+(entry-sl),tp2:entry+(entry-sl)*2,tp3:entry+(entry-sl)*3};
-if(sl>entry){ sig.tp1=entry-(sl-entry); sig.tp2=entry-(sl-entry)*2; sig.tp3=entry-(sl-entry)*3; }
-const r=calcRiskSignal(sig);
-if(!r||r.rejected){ $('calcResult').innerHTML=<div class="empty-state" style="color:var(--red)">${r?r.reason:'خطا'}</div>; return; }
-$('calcResult').innerHTML=`<div class="stat-grid">
-<div class="stat-item"><div class="stat-label">حجم</div><div class="stat-value gold">${r.qty.toFixed(4)}</div></div>
-<div class="stat-item"><div class="stat-label">مارجین</div><div class="stat-value">${r.margin.toFixed(2)} USDT</div></div>
-<div class="stat-item"><div class="stat-label">زیان نهایی</div><div class="stat-value red">${r.lossWithFee.toFixed(2)} USDT</div></div>
-<div class="stat-item"><div class="stat-label">R:R</div><div class="stat-value green">${r.rr1.toFixed(2)}</div></div>
-
-  </div>`;  
-}  function saveRiskSettings(){
-RISK.capital=parseFloat($('riskCapital').value)||50; RISK.perTrade=parseFloat($('riskPerTrade').value)||1;
-RISK.leverage=parseFloat($('riskLeverage').value)||20; RISK.maxRiskPct=parseFloat($('riskMaxPct').value)||30;
-localStorage.setItem('riskSettings',JSON.stringify(RISK)); toast('ذخیره شد');
-}
-
-// اصلاح هوشمند لینک پروکسی
-function saveSettings(){
-let val = $('proxyInput').value.trim();
-
-// ۱. پاک کردن علامت مساوی که مرورگر به اشتباه اول متن گذاشته
-val = val.replace(/^=+/, '');
-
-// ۲. اگر کاربر ?url= را ننوشته بود، خودمان اضافه می‌کنیم
-if(val && !val.includes('?url=')) {
-if(val.endsWith('?')) val += 'url=';
-else val += '?url=';
-}
-
-if(val) {
-localStorage.setItem('proxyUrl', val);
-} else {
-localStorage.removeItem('proxyUrl');
-}
-
-$('proxyInput').value = val; // نمایش لینک اصلاح شده به کاربر
-toast('ذخیره شد. در حال تست...');
-init();
-}
-
-document.querySelectorAll('.nav-tab').forEach(tab=>{
-tab.addEventListener('click',()=>{
-document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
-document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-tab.classList.add('active'); $('page-'+tab.dataset.page).classList.add('active');
-if(tab.dataset.page==='technical') loadSymbols();
-});
-});
-
-async function init(){
-$('riskCapital').value=RISK.capital; $('riskPerTrade').value=RISK.perTrade;
-$('riskLeverage').value=RISK.leverage; $('riskMaxPct').value=RISK.maxRiskPct;
-$('whaleThreshold').value=WHALE_THRESHOLD;
-$('proxyInput').value = localStorage.getItem('proxyUrl') || '';
-
-try { await fetchInstruments(); setConn(true); } catch(e){ setConn(false); }
-if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
-}
-init();
-</script>
-
-</body>  
-</html>
