@@ -1,23 +1,252 @@
 <!DOCTYPE html>
-<html dir="rtl">
-<body style="background:#111;color:#fff;font-family:Tahoma;padding:20px">
-<h2>تست اتصال به MEXC</h2>
-<button onclick="test()" style="padding:15px;font-size:18px;background:#d4af37;color:#000;border:none;border-radius:8px">تست کن</button>
-<p id="res" style="margin-top:20px;font-size:14px;word-break:break-all;line-height:1.6">نتیجه اینجا نمایش داده می‌شود...</p>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Shakil Trade Analyzer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a0a">
+<style>
+:root{--bg:#0a0a0a;--card:#141414;--border:#2a2a2a;--gold:#d4af37;--text:#e8e8e8;--dim:#888;--green:#00c853;--red:#ff1744;--turq:#00bcd4;--yel:#ffc107}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Tahoma,sans-serif}
+body{background:var(--bg);color:var(--text);padding-bottom:60px}
+header{background:#111;padding:12px;border-bottom:1px solid var(--gold);display:flex;justify-content:space-between;position:sticky;top:0;z-index:99}
+h1{font-size:15px;color:var(--gold)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--dim);display:inline-block}
+.dot.on{background:var(--green);box-shadow:0 0 5px var(--green)}
+.dot.off{background:var(--red)}
+nav{display:flex;overflow-x:auto;gap:5px;padding:10px;background:#111}
+.tab{padding:6px 12px;border-radius:15px;border:1px solid var(--border);background:0;color:var(--dim);font-size:11px;white-space:nowrap}
+.tab.active{background:var(--gold);color:#000;font-weight:bold}
+.page{display:none;padding:12px}
+.page.active{display:block}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px}
+.title{color:var(--gold);font-size:12px;font-weight:bold;margin-bottom:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.item{background:#1a1a1a;padding:8px;border-radius:6px;text-align:center}
+.lbl{font-size:10px;color:var(--dim)}
+.val{font-size:14px;font-weight:bold}
+.val.g{color:var(--green)} .val.r{color:var(--red)} .val.y{color:var(--gold)}
+.box{background:#1a1a1a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:6px;width:100%;margin-bottom:8px}
+.btn{width:100%;padding:10px;border:0;border-radius:6px;font-weight:bold;font-size:12px;cursor:pointer}
+.btn.gold{background:var(--gold);color:#000}
+.btn.out{background:0;border:1px solid var(--gold);color:var(--gold)}
+.sig{border-right:3px solid var(--dim);padding:10px;background:var(--card);border-radius:6px;margin-bottom:8px}
+.sig.L{border-color:var(--green)} .sig.S{border-color:var(--red)} .sig.SL{border-color:var(--turq)} .sig.SS{border-color:var(--yel)}
+#chart{width:100%;height:250px} #rsi{width:100%;height:100px;margin-top:5px}
+.whale{display:flex;justify-content:space-between;font-size:11px;padding:5px 0;border-bottom:1px solid #222}
+</style>
+</head>
+<body>
+<header><h1>Shakil Trade Analyzer</h1><div><span class="dot" id="cDot"></span><span id="cTxt" style="font-size:10px;color:var(--dim)">اتصال</span></div></header>
+<nav>
+  <div class="tab active" onclick="nav('dash')">داشبورد</div>
+  <div class="tab" onclick="nav('scan')">اسکنر</div>
+  <div class="tab" onclick="nav('whale')">سفارشات سنگین</div>
+  <div class="tab" onclick="nav('chart')">نمودار</div>
+  <div class="tab" onclick="nav('risk')">مدیریت ریسک</div>
+</nav>
+
+<div class="page active" id="p-dash">
+  <div class="card">
+    <div class="title">📊 وضعیت بازار</div>
+    <div class="grid">
+      <div class="item"><div class="lbl">قراردادها</div><div class="val y" id="sContracts">0</div></div>
+      <div class="item"><div class="lbl">سیگنال فعال</div><div class="val g" id="sSignals">0</div></div>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--yel)">
+    <div class="title" style="color:var(--yel)">🛠️ عیب‌یابی (مهم)</div>
+    <button class="btn out" onclick="testAPI()">تست دریافت لیست ارزها</button>
+    <div id="dbg" style="font-size:10px;margin-top:8px;color:var(--dim);word-break:break-all">در حال دریافت...</div>
+  </div>
+  <div class="card"><div class="title">📈 آخرین سیگنال‌ها</div><div id="recent">—</div></div>
+</div>
+
+<div class="page" id="p-scan">
+  <div class="card">
+    <div class="title">🔍 اسکنر</div>
+    <input type="number" id="scanLimit" class="box" value="20" placeholder="تعداد اسکن">
+    <button class="btn gold" id="btnScan" onclick="runScan()">شروع اسکن</button>
+    <div style="font-size:10px;color:var(--dim);margin-top:5px" id="scanSt">آماده</div>
+  </div>
+  <div id="scanRes"></div>
+</div>
+
+<div class="page" id="p-whale">
+  <div class="card">
+    <div class="title">🐋 سفارشات سنگین</div>
+    <input type="number" id="whaleLimit" class="box" value="5000" placeholder="حداقل حجم USDT">
+    <select id="whaleSym" class="box"><option>در حال دریافت...</option></select>
+    <button class="btn gold" onclick="startWhale()">شروع رصد</button>
+    <button class="btn out" onclick="stopWhale()" style="margin-top:5px">توقف</button>
+  </div>
+  <div class="card"><div id="whaleList">در حال دریافت...</div></div>
+</div>
+
+<div class="page" id="p-chart">
+  <div class="card">
+    <div class="title">📉 نمودار</div>
+    <select id="chartSym" class="box" onchange="loadChart(this.value)"><option>در حال دریافت...</option></select>
+    <div id="chart"></div><div id="rsi"></div>
+    <div style="font-size:10px;color:var(--dim);margin-top:5px" id="indSum">—</div>
+  </div>
+</div>
+
+<div class="page" id="p-risk">
+  <div class="card">
+    <div class="title">💰 تنظیمات ریسک</div>
+    <input type="number" id="rCap" class="box" value="50" placeholder="سرمایه">
+    <input type="number" id="rPer" class="box" value="1" placeholder="ریسک هر معامله">
+    <input type="number" id="rLev" class="box" value="20" placeholder="اهرم">
+    <button class="btn gold" onclick="saveRisk()">ذخیره</button>
+  </div>
+  <div class="card">
+    <div class="title">🧮 ماشین‌حساب</div>
+    <input type="number" id="cEntry" class="box" placeholder="قیمت ورود">
+    <input type="number" id="cSL" class="box" placeholder="حد ضرر">
+    <button class="btn out" onclick="calcPos()">محاسبه</button>
+    <div id="calcRes" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <script>
-async function test(){
-  document.getElementById('res').innerText = 'در حال تست...';
+const API='https://shakil.m1358613m.workers.dev/api/v1';
+let RISK=JSON.parse(localStorage.getItem('rsk'))||{cap:50,per:1,lev:20};
+let wInt=null, chart=null, cSeries=null, rSeries=null;
+
+const $=id=>document.getElementById(id);
+const fmt=(n,d=4)=>(!n||isNaN(n))?'—':Number(n).toFixed(d);
+const dot=(ok)=>{$('cDot').className='dot '+(ok?'on':'off'); $('cTxt').innerText=ok?'متصل':'قطع';};
+function nav(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));$('p-'+id).classList.add('active');event.target.classList.add('active'); if(id==='chart' && $('chartSym').options.length>0) loadChart($('chartSym').value);}
+
+async function testAPI(){
+  $('dbg').innerText='در حال تست...';
   try {
-    const res = await fetch('https://shakil.m1358613m.workers.dev/api/v1/contract/detail');
-    const json = await res.json();
-    let list = json.data || [];
-    if (!Array.isArray(list)) list = Object.values(list);
-    const usdt = list.filter(c => c.symbol && c.symbol.endsWith('USDT'));
-    document.getElementById('res').innerText = 'موفق! تعداد کل: ' + list.length + ' - تعداد USDT: ' + usdt.length + ' - اولین نماد: ' + (usdt[0] ? usdt[0].symbol : 'هیچ');
-  } catch(e) {
-    document.getElementById('res').innerText = 'خطای شبکه: ' + e.message;
-  }
+    const r=await fetch(API+'/contract/detail'); const j=await r.json();
+    let list=j.data||[]; if(!Array.isArray(list)) list=Object.values(list);
+    const u=list.filter(c=>c.symbol&&c.symbol.endsWith('USDT'));
+    $('dbg').innerText=`موفق. کل: ${list.length} | USDT: ${u.length} | اولی: ${u[0]?.symbol||'هیچ'}`;
+    if(u.length>0) fillSyms(u);
+  } catch(e){ $('dbg').innerText='خطای شبکه: '+e.message; }
 }
+
+async function getSyms(){
+  const r=await fetch(API+'/contract/detail'); const j=await r.json();
+  let list=j.data||[]; if(!Array.isArray(list)) list=Object.values(list);
+  dot(true); return list.filter(c=>c.symbol&&c.symbol.endsWith('USDT'));
+}
+
+async function getKlines(sym,intv){
+  const map={'1m':'Min1','5m':'Min5','15m':'Min15','1h':'Min60','4h':'Hour4'};
+  const r=await fetch(`${API}/contract/kline/${sym}?interval=${map[intv]||'Min60'}`);
+  const j=await r.json();
+  if(!j.data||!j.data.time) return [];
+  return j.data.time.map((t,i)=>({time:Math.floor(t),open:+j.data.open[i],high:+j.data.high[i],low:+j.data.low[i],close:+j.data.close[i],vol:+j.data.vol[i]}));
+}
+
+function EMA(d,l){const k=2/(l+1);let p=null;return d.map((v,i)=>{if(i<l-1)return null;if(p===null)p=d.slice(0,l).reduce((a,b)=>a+b,0)/l;else p=v*k+p*(1-k);return p;});}
+function RSI(c,l=14){const o=[null];let ag=0,al=0;for(let i=1;i<c.length;i++){let ch=c[i]-c[i-1];if(i<=l){ag+=Math.max(ch,0);al+=Math.max(-ch,0);if(i===l){ag/=l;al/=l;}o.push(null);}else{ag=(ag*(l-1)+Math.max(ch,0))/l;al=(al*(l-1)+Math.max(-ch,0))/l;o.push(al===0?100:100-100/(1+ag/al));}}return o;}
+
+function analyze(k){
+  if(k.length<50) return null;
+  const c=k.map(x=>x.close),h=k.map(x=>x.high),l=k.map(x=>x.low),v=k.map(x=>x.vol);
+  const e20=EMA(c,20),e50=EMA(c,50),r=RSI(c),a=c.length-1, vAvg=v.slice(-20).reduce((x,y)=>x+y,0)/20;
+  return {p:c[a],up:e20[a]>e50[a]&&c[a]>e20[a],dn:e20[a]<e50[a]&&c[a]<e20[a],rsi:r[a],volRatio:v[a]/(vAvg||1)};
+}
+
+async function runScan(){
+  $('btnScan').disabled=true; $('btnScan').innerText='در حال اسکن...';
+  $('scanRes').innerHTML='<div style="text-align:center;padding:20px">صبر کنید...</div>';
+  try{
+    const syms=await getSyms(); $('sContracts').innerText=syms.length;
+    const lim=parseInt($('scanLimit').value)||20; const res=[];
+    for(let i=0;i<Math.min(lim,syms.length);i++){
+      const s=syms[i].symbol;
+      try{
+        const [k4,k1,k15,k5]=await Promise.all([getKlines(s,'4h'),getKlines(s,'1h'),getKlines(s,'15m'),getKlines(s,'5m')]);
+        const a4=analyze(k4),a1=analyze(k1),a15=analyze(k15),a5=analyze(k5);
+        if(!a4||!a1||!a15||!a5) continue;
+        let sc=0,bul=0,ber=0;
+        if(a4.up){sc+=25;bul++;}else if(a4.dn){sc+=25;ber++;}
+        if(a1.up&&bul>0){sc+=20;bul++;}else if(a1.dn&&ber>0){sc+=20;ber++;}
+        if(a15.rsi>50){sc+=15;bul++;}else if(a15.rsi<50){sc+=15;ber++;}
+        if(a5.rsi>50){sc+=15;bul++;}else if(a5.rsi<50){sc+=15;ber++;}
+        if(a5.volRatio>1.2) sc+=10;
+        if(bul>=3&&ber<=1) sc+=15; else if(ber>=3&&bul<=1) sc+=15; else sc=Math.max(0,sc-10);
+        
+        // حساسیت کم شده: 50 به جای 70
+        let type=sc>=50?(bul>ber?'LONG':'SHORT'):sc>=30?(bul>ber?'SETUP_LONG':'SETUP_SHORT'):'WAIT';
+        if(type!=='WAIT'){
+          const atr=Math.abs(a5.p-a15.p)*0.5||a5.p*0.01;
+          const slDist=atr*1.5;
+          let entry=a5.p, sl, tp1;
+          if(type.includes('LONG')){sl=entry-slDist;tp1=entry+slDist;}else{sl=entry+slDist;tp1=entry-slDist;}
+          res.push({sym:s,type,sc,entry,sl,tp1,rr:Math.abs(tp1-entry)/slDist});
+        }
+        await new Promise(r=>setTimeout(r,100));
+      }catch(e){}
+    }
+    $('sSignals').innerText=res.length;
+    $('scanRes').innerHTML=res.length?res.map(s=>`<div class="sig ${s.type[0]==='L'?'L':s.type==='SHORT'?'S':s.type==='SETUP_LONG'?'SL':'SS'}"><b>${s.sym}</b> - ${s.type} (امتیاز: ${s.sc})<br><span style="font-size:10px">ورود: ${fmt(s.entry)} | SL: ${fmt(s.sl)} | RR: ${s.rr.toFixed(2)}</span></div>`).join(''):'<div style="text-align:center">سیگنالی یافت نشد</div>';
+  }catch(e){$('scanRes').innerHTML=`<div style="color:red;text-align:center">خطا: ${e.message}</div>`;}
+  $('btnScan').disabled=false; $('btnScan').innerText='شروع اسکن';
+}
+
+async function startWhale(){
+  stopWhale(); const sym=$('whaleSym').value; if(!sym) return alert('نماد را انتخاب کنید');
+  const lim=parseFloat($('whaleLimit').value)||5000;
+  $('whaleList').innerHTML='<div style="text-align:center">در حال رصد...</div>';
+  const fetchD=async()=>{
+    try{
+      const r=await fetch(`${API}/contract/depth/${sym}`); const j=await r.json();
+      if(j.data){
+        let html=''; const check=(arr,side)=>{if(arr)arr.forEach(l=>{const n=parseFloat(l[0])*parseFloat(l[1]); if(n>=lim) html+=`<div class="whale"><span style="color:${side==='BUY'?'var(--green)':'var(--red)'}">${side==='BUY'?'خرید':'فروش'}</span><span>${fmt(l[0])}</span><b>${fmt(n,0)}$</b></div>`;});};
+        check(j.data.bids,'BUY'); check(j.data.asks,'SELL');
+        if(html) $('whaleList').innerHTML=html;
+      }
+    }catch(e){}
+  };
+  fetchD(); wInt=setInterval(fetchD,2000);
+}
+function stopWhale(){ if(wInt) clearInterval(wInt); wInt=null; $('whaleList').innerHTML='متوقف شد'; }
+
+async function fillSyms(list){
+  const html=list.map(c=>`<option value="${c.symbol}">${c.symbol}</option>`).join('');
+  $('chartSym').innerHTML=html; $('whaleSym').innerHTML=html;
+  if(list.length) loadChart(list[0].symbol);
+}
+
+async function loadChart(sym){
+  if(!sym || sym==='در حال دریافت...') return;
+  try{
+    const k=await getKlines(sym,'1h');
+    if(!k.length) return;
+    if(!chart){
+      chart=LightweightCharts.createChart($('chart'),{layout:{background:{color:'#141414'},textColor:'#888'},grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},timeScale:{timeVisible:true}});
+      cSeries=chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderVisible:false,wickUpColor:'#00c853',wickDownColor:'#ff1744'});
+      rChart=LightweightCharts.createChart($('rsi'),{layout:{background:{color:'#141414'},textColor:'#888'},height:100,grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}}});
+      rSeries=rChart.addLineSeries({color:'#7E57C2'});
+    }
+    cSeries.setData(k.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close}))); chart.timeScale().fitContent();
+    const rv=RSI(k.map(x=>x.close));
+    rSeries.setData(k.map((x,i)=>({time:x.time,value:rv[i]})).filter(x=>x.value!==null));
+  }catch(e){}
+}
+
+function saveRisk(){RISK={cap:+$('rCap').value,per:+$('rPer').value,lev:+$('rLev').value};localStorage.setItem('rsk',JSON.stringify(RISK));alert('ذخیره شد');}
+function calcPos(){
+  const en=+$('cEntry').value, sl=+$('cSL').value;
+  if(!en||!sl||en===sl){$('calcRes').innerHTML='<span style="color:var(--yel)">اعداد را پر کنید</span>';return;}
+  const risk=Math.abs(en-sl), qty=RISK.per/risk, notl=qty*en, marg=notl/RISK.lev;
+  $('calcRes').innerHTML=`<div class="grid"><div class="item"><div class="lbl">حجم</div><div class="val y">${qty.toFixed(4)}</div></div><div class="item"><div class="lbl">مارجین</div><div class="val">${marg.toFixed(2)}$</div></div></div>`;
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  $('rCap').value=RISK.cap; $('rPer').value=RISK.per; $('rLev').value=RISK.lev;
+  testAPI();
+});
 </script>
 </body>
 </html>
