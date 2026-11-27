@@ -84,6 +84,14 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
       <div class="stat-item"><div class="stat-label">سیگنال فعال</div><div class="stat-value green" id="statSignals">—</div></div>
     </div>
   </div>
+  
+  <!-- دکمه تست اتصال برای عیب‌یابی -->
+  <div class="card" style="border-color:var(--yellow)">
+    <div class="card-title" style="color:var(--yellow)">🛠️ عیب‌یابی اتصال</div>
+    <button class="btn btn-outline" onclick="testAPI()" style="border-color:var(--yellow);color:var(--yellow)">تست دریافت لیست ارزها</button>
+    <div id="debugText" style="font-size:10px; color:var(--text-dim); margin-top:8px; word-break:break-all; line-height:1.5;">برای تست کلیک کنید</div>
+  </div>
+
   <div class="card">
     <div class="card-title">🐋 سفارشات سنگین اخیر</div>
     <div id="whaleDashboard"><div class="empty-state">برای رصد، به تب سفارشات سنگین بروید</div></div>
@@ -108,7 +116,7 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
   <div class="card">
     <div class="card-title">🐋 تشخیص سفارشات سنگین (REST)</div>
     <div class="form-group"><label>آستانه حجم سفارش (USDT)</label><input type="number" id="whaleThreshold" value="5000" min="100" step="1000"></div>
-    <div class="form-group"><label>نماد</label><select id="whaleSymbolSelect"></select></div>
+    <div class="form-group"><label>نماد</label><select id="whaleSymbolSelect"><option value="">در حال دریافت...</option></select></div>
     <button class="btn btn-gold" onclick="connectWhaleWS()">شروع رصد</button>
     <button class="btn btn-outline" style="margin-top:8px;" onclick="stopWhale()">توقف رصد</button>
     <div style="margin-top:6px;font-size:10px;color:var(--text-dim)" id="whaleStatus">قطع</div>
@@ -122,7 +130,7 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 <div class="page" id="page-technical">
   <div class="card">
     <div class="card-title">📉 نمودار قیمت + RSI</div>
-    <select id="symbolSelect" style="width:100%;padding:9px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text);margin-bottom:10px;font-size:12px"></select>
+    <select id="symbolSelect" style="width:100%;padding:9px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text);margin-bottom:10px;font-size:12px"><option value="">در حال دریافت...</option></select>
     <div id="chart-container"></div>
     <div id="rsi-container"></div>
     <div style="font-size:10px;color:var(--text-dim);margin-top:4px" id="indicatorSummary">—</div>
@@ -164,6 +172,26 @@ function fmt(n,d=4){ return (n===null||n===undefined||isNaN(n))?'—':Number(n).
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 function setConn(ok){ $('connDot').className='status-dot '+(ok?'online':'offline'); $('connText').textContent=ok?'متصل':'قطع'; }
 
+// تابع تست اتصال برای عیب‌یابی
+async function testAPI() {
+  const dbg = $('debugText');
+  dbg.textContent = 'در حال تست...';
+  try {
+    const res = await fetch(API_BASE + PUB + '/contract/detail');
+    const json = await res.json();
+    if(json.success) {
+      let list = json.data || [];
+      if(!Array.isArray(list)) list = Object.values(list);
+      const usdtList = list.filter(c => c.symbol && c.symbol.endsWith('USDT'));
+      dbg.textContent = `پاسخ سرور: موفق. تعداد کل: ${list.length}. نمادهای USDT: ${usdtList.length}. اولین نماد: ${usdtList[0]?.symbol || 'نامشخص'}`;
+    } else {
+      dbg.textContent = 'پاسخ سرور: خطا. ' + JSON.stringify(json).substring(0, 100);
+    }
+  } catch(e) {
+    dbg.textContent = 'خطای شبکه: ' + e.message;
+  }
+}
+
 async function apiFetch(path, params={}){
   let targetUrl = API_BASE + PUB + path;
   const qs = new URLSearchParams(params).toString();
@@ -182,14 +210,16 @@ async function apiFetch(path, params={}){
   } catch(e) { 
     clearTimeout(timer); 
     setConn(false);
-    throw new Error('عدم دسترسی به سرور. لطفاً فیلترشکن را روشن کنید.');
+    throw new Error('عدم دسترسی: ' + e.message);
   }
 }
 
 async function fetchInstruments(){
   const data = await apiFetch('/contract/detail');
-  const list = data.data || [];
-  // فیلتر ساده و مطمئن برای MEXC
+  let list = data.data || [];
+  if (!Array.isArray(list)) {
+    list = Object.values(list);
+  }
   return list.filter(c => c.symbol && c.symbol.endsWith('USDT'));
 }
 
@@ -198,7 +228,7 @@ async function fetchKlines(symbol, interval, limit=200){
   const intervalParam = intervalMap[interval] || 'Min60';
   
   const data = await apiFetch('/contract/kline/' + symbol, {interval:intervalParam});
-  if(!data.data || !data.data.time) return [];
+  if(!data.success || !data.data || !data.data.time) return [];
   
   const times = data.data.time;
   const opens = data.data.open;
@@ -207,18 +237,14 @@ async function fetchKlines(symbol, interval, limit=200){
   const closes = data.data.close;
   const vols = data.data.vol;
 
-  return times.map((t, i) => {
-    // MEXC معمولاً زمان را به میلی‌ثانیه می‌دهد. تبدیل به ثانیه:
-    let timeInSec = t > 10000000000 ? Math.floor(t / 1000) : Math.floor(t);
-    return {
-      time: timeInSec,
-      open: +opens[i],
-      high: +highs[i],
-      low: +lows[i],
-      close: +closes[i],
-      volume: +vols[i]
-    };
-  }).sort((a,b)=>a.time-b.time);
+  return times.map((t, i) => ({
+    time: Math.floor(t),
+    open: +opens[i],
+    high: +highs[i],
+    low: +lows[i],
+    close: +closes[i],
+    volume: +vols[i]
+  })).sort((a,b)=>a.time-b.time);
 }
 
 // ==================== Indicators ====================
@@ -275,6 +301,11 @@ async function startScan(){
   try {
     const instruments=await fetchInstruments();
     $('statContracts').textContent=instruments.length;
+    
+    if (instruments.length === 0) {
+      throw new Error('لیست ارزها خالی دریافت شد. لطفاً دکمه تست اتصال را در داشبورد بزنید.');
+    }
+
     const symbols=instruments.slice(0,limit);
     const results=[];
     for(const ins of symbols){
@@ -306,7 +337,7 @@ async function startScan(){
     $('scanStatus').textContent=`${results.length} سیگنال از ${limit} نماد`;
     updateDashboard(results);
   } catch(e){
-    $('scanResults').innerHTML=`<div class="empty-state">خطا: ${e.message}<br><small>لطفاً فیلترشکن را روشن کنید.</small></div>`;
+    $('scanResults').innerHTML=`<div class="empty-state" style="color:var(--red)">خطا: ${e.message}</div>`;
   } finally { btn.disabled=false; btn.textContent='شروع اسکن'; }
 }
 
@@ -334,7 +365,7 @@ function updateDashboard(results){
   $('recentSignals').innerHTML=results.slice(0,3).map(s=>signalCardHTML(s)).join('')||'<div class="empty-state">سیگنالی نیست</div>';
 }
 
-// ==================== Whale (REST API instead of WebSocket) ====================
+// ==================== Whale (REST API) ====================
 function stopWhale() {
   if(whaleInterval) {
     clearInterval(whaleInterval);
@@ -356,7 +387,7 @@ function connectWhaleWS(){
   const fetchDepth = async () => {
     try {
       const data = await apiFetch('/contract/depth/' + sym);
-      if(data && data.data) {
+      if(data && data.success && data.data) {
         const book = data.data;
         const processSide=(arr,side)=>{
           if(!arr) return;
@@ -395,8 +426,7 @@ function addWhaleToUI(w){
 let chart=null, candleSeries=null, rsiChart=null, rsiSeries=null;
 
 function initCharts(){
-  if(chart) chart.remove();
-  if(rsiChart) rsiChart.remove();
+  if(chart) return;
   chart=LightweightCharts.createChart($('chart-container'),{
     layout:{background:{color:'#141414'},textColor:'#888'},
     grid:{vertLines:{color:'#1f1f1f'},horzLines:{color:'#1f1f1f'}},
@@ -416,9 +446,14 @@ function initCharts(){
 }
 
 async function loadChart(symbol){
+  if(!symbol) return;
   try {
     const klines=await fetchKlines(symbol,'1h',200);
     if(!chart) initCharts();
+    if(klines.length === 0) {
+      toast('خطا: داده کندل دریافت نشد');
+      return;
+    }
     candleSeries.setData(klines.map(k=>({time:k.time,open:k.open,high:k.high,low:k.low,close:k.close})));
     chart.timeScale().fitContent();
     const closes=klines.map(k=>k.close);
@@ -430,17 +465,28 @@ async function loadChart(symbol){
 }
 
 async function loadSymbols(){
+  const sel=$('symbolSelect'), wsel=$('whaleSymbolSelect');
+  sel.innerHTML = '<option value="">در حال دریافت...</option>';
+  wsel.innerHTML = '<option value="">در حال دریافت...</option>';
   try {
     const ins=await fetchInstruments();
-    const sel=$('symbolSelect'), wsel=$('whaleSymbolSelect');
+    if (!ins || ins.length === 0) {
+      sel.innerHTML = '<option value="">لیست خالی است</option>';
+      wsel.innerHTML = '<option value="">لیست خالی است</option>';
+      return;
+    }
     const opts=ins.map(i=>`<option value="${i.symbol}">${i.symbol}</option>`).join('');
     sel.innerHTML=opts; wsel.innerHTML=opts;
     sel.onchange=()=>loadChart(sel.value);
     
-    if(ins.length && $('page-technical').classList.contains('active')) {
+    if($('page-technical').classList.contains('active')) {
       loadChart(ins[0].symbol);
     }
-  } catch(e){ console.warn('خطا در دریافت نمادها'); }
+  } catch(e){
+    console.error(e);
+    sel.innerHTML = `<option value="">خطا: ${e.message}</option>`;
+    wsel.innerHTML = `<option value="">خطا: ${e.message}</option>`;
+  }
 }
 
 // ==================== Risk Calc ====================
@@ -478,7 +524,7 @@ document.querySelectorAll('.nav-tab').forEach(tab=>{
     tab.classList.add('active'); $('page-'+tab.dataset.page).classList.add('active');
     
     if(tab.dataset.page==='technical') {
-      if($('symbolSelect').options.length === 0) loadSymbols();
+      if($('symbolSelect').options.length === 0 || $('symbolSelect').value === "") loadSymbols();
       else loadChart($('symbolSelect').value);
     }
   });
@@ -489,10 +535,12 @@ async function init(){
   $('riskLeverage').value=RISK.leverage; $('riskMaxPct').value=RISK.maxRiskPct;
   $('whaleThreshold').value=WHALE_THRESHOLD;
   
-  await loadSymbols();
+  loadSymbols();
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
-init();
+
+// اجرای برنامه بعد از لود کامل DOM
+window.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
