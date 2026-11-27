@@ -152,9 +152,8 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
   <div class="card">
     <div class="card-title">⚙️ تنظیمات</div>
     <div class="form-group">
-      <label>پروکسی (اختیاری)</label>
-      <input type="text" id="proxyInput" placeholder="در صورت نیاز، لینک پروکسی را وارد کنید">
-      <div style="font-size:10px;color:var(--text-dim);margin-top:4px">برنامه به‌طور پیش‌فرض مستقیماً به MEXC متصل می‌شود و نیازی به پروکسی ندارد.</div>
+      <label>پروکسی دستی (اختیاری - خالی بگذارید)</label>
+      <input type="text" id="proxyInput" placeholder="خالی بگذارید تا برنامه خودش بهترین مسیر را انتخاب کند">
     </div>
     <button class="btn btn-gold" onclick="saveSettings()">ذخیره تنظیمات</button>
   </div>
@@ -166,7 +165,13 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 // ==================== MEXC API Config ====================
 const API_BASE = 'https://contract.mexc.com';
 const PUB = '/api/v1';
-let PROXY = localStorage.getItem('proxyUrl') || ''; // به صورت پیش‌فرض خالی است (اتصال مستقیم)
+
+// لیست پروکسی‌هایی که برنامه به ترتیب تست می‌کند
+const AUTO_PROXIES = [
+  'https://proxy.cors.dev/',
+  'https://api.allorigins.win/raw?url=',
+  'https://corsproxy.io/?'
+];
 
 let RISK = JSON.parse(localStorage.getItem('riskSettings')) || { capital:50, perTrade:1, leverage:20, maxRiskPct:30 };
 let WHALE_THRESHOLD = parseFloat(localStorage.getItem('whaleThreshold')) || 5000;
@@ -178,43 +183,41 @@ function fmt(n,d=4){ return (n===null||n===undefined||isNaN(n))?'—':Number(n).
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 function setConn(ok){ $('connDot').className='status-dot '+(ok?'online':'offline'); $('connText').textContent=ok?'متصل':'قطع'; }
 
-// ==================== API Fetch ====================
+// ==================== API Fetch (با سیستم تست خودکار) ====================
 async function apiFetch(path, params={}){
   let targetUrl = API_BASE + PUB + path;
   const qs = new URLSearchParams(params).toString();
   if(qs) targetUrl += '?' + qs;
-  
-  let url = targetUrl;
-  if(PROXY) {
-    url = PROXY + encodeURIComponent(targetUrl);
-  }
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(()=>ctrl.abort(), 12000);
-  try {
-    const res = await fetch(url, {signal:ctrl.signal});
-    clearTimeout(timer);
-    if(res.ok) {
-      setConn(true);
-      return await res.json();
+  const userProxy = localStorage.getItem('proxyUrl');
+  let proxiesToTry = userProxy ? [userProxy] : AUTO_PROXIES;
+
+  for(let proxy of proxiesToTry) {
+    let url = proxy ? proxy + encodeURIComponent(targetUrl) : targetUrl;
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 8000);
+    try {
+      const res = await fetch(url, {signal:ctrl.signal});
+      clearTimeout(timer);
+      if(res.ok) {
+        setConn(true);
+        return await res.json();
+      }
+    } catch(e) {
+      console.warn('تلاش ناموفق با پروکسی:', proxy);
     }
-    throw new Error('HTTP '+res.status);
-  } catch(e) { 
-    clearTimeout(timer); 
-    setConn(false);
-    throw new Error('عدم دسترسی. لطفاً فیلترشکن را روشن کنید.');
   }
+  setConn(false);
+  throw new Error('عدم دسترسی به سرور. لطفاً فیلترشکن را روشن کنید.');
 }
 
 async function fetchInstruments(){
   const data = await apiFetch('/contract/detail');
-  setConn(true);
   const list = data.data || [];
   return list.filter(c => c.symbol && c.symbol.endsWith('USDT'));
 }
 
 async function fetchKlines(symbol, interval, limit=200){
-  // MEXC intervals: Min1, Min5, Min15, Hour1, Hour4
   const intervalMap = {'1m':'Min1','5m':'Min5','15m':'Min15','1h':'Hour1','4h':'Hour4'};
   const intervalParam = intervalMap[interval] || 'Hour1';
   const data = await apiFetch('/contract/kline/' + symbol, {interval:intervalParam, limit:limit});
@@ -350,7 +353,7 @@ function updateDashboard(results){
   $('recentSignals').innerHTML=results.slice(0,3).map(s=>signalCardHTML(s)).join('')||'<div class="empty-state">سیگنالی نیست</div>';
 }
 
-// WebSocket MEXC for Order Book
+// ==================== WebSocket ====================
 function connectWhaleWS(){
   if(wsWhale){ wsWhale.close(); wsWhale=null; }
   const sym=$('whaleSymbolSelect').value;
@@ -478,9 +481,12 @@ function saveRiskSettings(){
 
 function saveSettings(){
   const val = $('proxyInput').value.trim();
-  localStorage.setItem('proxyUrl', val);
-  PROXY = val;
-  toast('ذخیره شد. در حال تست اتصال...');
+  if(val) {
+    localStorage.setItem('proxyUrl', val);
+  } else {
+    localStorage.removeItem('proxyUrl');
+  }
+  toast('ذخیره شد. در حال تست...');
   init();
 }
 
@@ -497,7 +503,8 @@ async function init(){
   $('riskCapital').value=RISK.capital; $('riskPerTrade').value=RISK.perTrade;
   $('riskLeverage').value=RISK.leverage; $('riskMaxPct').value=RISK.maxRiskPct;
   $('whaleThreshold').value=WHALE_THRESHOLD;
-  $('proxyInput').value=PROXY;
+  $('proxyInput').value = localStorage.getItem('proxyUrl') || '';
+  
   try { await fetchInstruments(); setConn(true); } catch(e){ setConn(false); }
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
