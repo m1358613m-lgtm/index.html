@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Shakil Trade Analyzer (OKX)</title>
+<title>Shakil Trade Analyzer (MEXC)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a0a0a">
 <style>
@@ -150,10 +150,11 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 
 <div class="page" id="page-settings">
   <div class="card">
-    <div class="card-title">⚙️ تنظیمات پروکسی</div>
+    <div class="card-title">⚙️ تنظیمات</div>
     <div class="form-group">
-      <label>لینک پروکسی اختصاصی (Cloudflare Worker)</label>
-      <input type="text" id="proxyInput" placeholder="https://your-worker.workers.dev/?url=">
+      <label>پروکسی (اختیاری)</label>
+      <input type="text" id="proxyInput" placeholder="در صورت نیاز، لینک پروکسی را وارد کنید">
+      <div style="font-size:10px;color:var(--text-dim);margin-top:4px">برنامه به‌طور پیش‌فرض مستقیماً به MEXC متصل می‌شود و نیازی به پروکسی ندارد.</div>
     </div>
     <button class="btn btn-gold" onclick="saveSettings()">ذخیره تنظیمات</button>
   </div>
@@ -162,10 +163,10 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 <div class="toast" id="toast"></div>
 <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <script>
-// ==================== OKX API Config ====================
-const API_BASE = 'https://www.okx.com';
-const PUB = '/api/v5';
-let PROXY = localStorage.getItem('proxyUrl') || 'https://shakil.m1358613m.workers.dev/?url=';
+// ==================== MEXC API Config ====================
+const API_BASE = 'https://contract.mexc.com';
+const PUB = '/api/v1';
+let PROXY = localStorage.getItem('proxyUrl') || ''; // به صورت پیش‌فرض خالی است (اتصال مستقیم)
 
 let RISK = JSON.parse(localStorage.getItem('riskSettings')) || { capital:50, perTrade:1, leverage:20, maxRiskPct:30 };
 let WHALE_THRESHOLD = parseFloat(localStorage.getItem('whaleThreshold')) || 5000;
@@ -201,27 +202,38 @@ async function apiFetch(path, params={}){
   } catch(e) { 
     clearTimeout(timer); 
     setConn(false);
-    throw new Error('عدم دسترسی. لطفاً لینک پروکسی را در تنظیمات بررسی کنید.');
+    throw new Error('عدم دسترسی. لطفاً فیلترشکن را روشن کنید.');
   }
 }
 
 async function fetchInstruments(){
-  const data = await apiFetch('/public/instruments', {instType:'SWAP'});
+  const data = await apiFetch('/contract/detail');
   setConn(true);
   const list = data.data || [];
-  return list.filter(c => c.settleCcy === 'USDT');
+  return list.filter(c => c.symbol && c.symbol.endsWith('USDT'));
 }
 
 async function fetchKlines(symbol, interval, limit=200){
-  // OKX bar formats: 1m, 5m, 15m, 1H, 4H
-  const barMap = {'1m':'1m','5m':'5m','15m':'15m','1h':'1H','4h':'4H'};
-  const bar = barMap[interval] || '1H';
-  const data = await apiFetch('/market/candles', {instId:symbol, bar:bar, limit:limit});
-  if(!Array.isArray(data.data)) return [];
-  // OKX returns [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
-  return data.data.map(k => ({
-    time: Math.floor(parseInt(k[0])/1000),
-    open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5]
+  // MEXC intervals: Min1, Min5, Min15, Hour1, Hour4
+  const intervalMap = {'1m':'Min1','5m':'Min5','15m':'Min15','1h':'Hour1','4h':'Hour4'};
+  const intervalParam = intervalMap[interval] || 'Hour1';
+  const data = await apiFetch('/contract/kline/' + symbol, {interval:intervalParam, limit:limit});
+  if(!data.data || !data.data.time) return [];
+  
+  const times = data.data.time;
+  const opens = data.data.open;
+  const highs = data.data.high;
+  const lows = data.data.low;
+  const closes = data.data.close;
+  const vols = data.data.vol;
+
+  return times.map((t, i) => ({
+    time: Math.floor(t),
+    open: +opens[i],
+    high: +highs[i],
+    low: +lows[i],
+    close: +closes[i],
+    volume: +vols[i]
   })).sort((a,b)=>a.time-b.time);
 }
 
@@ -282,7 +294,7 @@ async function startScan(){
     const symbols=instruments.slice(0,limit);
     const results=[];
     for(const ins of symbols){
-      const sym=ins.instId; // e.g. BTC-USDT-SWAP
+      const sym=ins.symbol;
       try {
         const [k4h,k1h,k15m,k5m]=await Promise.all([
           fetchKlines(sym,'4h',100), fetchKlines(sym,'1h',100),
@@ -310,7 +322,7 @@ async function startScan(){
     $('scanStatus').textContent=`${results.length} سیگنال از ${limit} نماد`;
     updateDashboard(results);
   } catch(e){
-    $('scanResults').innerHTML=`<div class="empty-state">خطا: ${e.message}<br><small>لطفاً فیلترشکن را روشن کنید و لینک پروکسی را در تنظیمات بررسی کنید.</small></div>`;
+    $('scanResults').innerHTML=`<div class="empty-state">خطا: ${e.message}<br><small>لطفاً فیلترشکن را روشن کنید.</small></div>`;
   } finally { btn.disabled=false; btn.textContent='شروع اسکن'; }
 }
 
@@ -338,7 +350,7 @@ function updateDashboard(results){
   $('recentSignals').innerHTML=results.slice(0,3).map(s=>signalCardHTML(s)).join('')||'<div class="empty-state">سیگنالی نیست</div>';
 }
 
-// WebSocket OKX for Order Book
+// WebSocket MEXC for Order Book
 function connectWhaleWS(){
   if(wsWhale){ wsWhale.close(); wsWhale=null; }
   const sym=$('whaleSymbolSelect').value;
@@ -349,20 +361,20 @@ function connectWhaleWS(){
   $('whaleList').innerHTML='<div class="loading"><div class="spinner"></div>در حال رصد...</div>';
 
   try {
-    wsWhale=new WebSocket('wss://ws.okx.com:8443/ws/v5/public');
+    wsWhale=new WebSocket('wss://contract.mexc.com/ws');
     wsWhale.onopen=()=>{
       $('whaleStatus').textContent='متصل - در حال رصد';
-      const sub={op:'subscribe', args:[{channel:'books5', instId:sym}]};
+      const sub={method:'sub.depth.full', param:{symbol:sym, limit:20}, id:Date.now()};
       wsWhale.send(JSON.stringify(sub));
-      setInterval(()=>{ if(wsWhale&&wsWhale.readyState===1) wsWhale.send('ping'); }, 25000);
+      setInterval(()=>{ if(wsWhale&&wsWhale.readyState===1) wsWhale.send(JSON.stringify({method:'ping'})); }, 25000);
     };
     wsWhale.onmessage=(ev)=>{
-      if(ev.data === 'pong') return;
       try {
         const msg=JSON.parse(ev.data);
-        if(msg.data && msg.data[0]) {
-          const book = msg.data[0];
+        if(msg.channel === 'push.depth.full' && msg.data) {
+          const book = msg.data;
           const processSide=(arr,side)=>{
+            if(!arr) return;
             arr.forEach(lvl=>{
               const price=parseFloat(lvl[0]);
               const qty=parseFloat(lvl[1]);
@@ -435,10 +447,10 @@ async function loadSymbols(){
   try {
     const ins=await fetchInstruments();
     const sel=$('symbolSelect'), wsel=$('whaleSymbolSelect');
-    const opts=ins.map(i=>`<option value="${i.instId}">${i.instId}</option>`).join('');
+    const opts=ins.map(i=>`<option value="${i.symbol}">${i.symbol}</option>`).join('');
     sel.innerHTML=opts; wsel.innerHTML=opts;
     sel.onchange=()=>loadChart(sel.value);
-    if(ins.length) loadChart(ins[0].instId);
+    if(ins.length) loadChart(ins[0].symbol);
   } catch(e){ toast('خطا در دریافت نمادها'); }
 }
 
@@ -466,10 +478,6 @@ function saveRiskSettings(){
 
 function saveSettings(){
   const val = $('proxyInput').value.trim();
-  if(!val.endsWith('?url=')) {
-    toast('لینک باید به ?url= ختم شود!');
-    return;
-  }
   localStorage.setItem('proxyUrl', val);
   PROXY = val;
   toast('ذخیره شد. در حال تست اتصال...');
